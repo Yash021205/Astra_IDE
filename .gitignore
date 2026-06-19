@@ -1,0 +1,115 @@
+# Personal / internal docs (kept locally, not shared with team)
+docs/BUILD_JOURNAL.md
+docs/ASCII_LOGO.md
+docs/EVAL_*.md
+docs-private/
+notes-*.md
+
+backend/__pycache__/
+backend/build/
+backend/dist/
+backend/lib/
+backend/lib64/
+backend/var/
+backend/wheels/
+backend/*.egg-info/
+ml/__pycache__/
+ml/build/
+ml/dist/
+ml/lib/
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtualenv
+venv/
+env/
+ENV/
+.venv/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+build/
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ML / Data
+*.h5
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.joblib
+*.onnx
+runs/
+wandb/
+mlruns/
+tensorboard/
+data/raw/
+data/processed/
+checkpoints/
+
+# Kubernetes / Helm
+*.kubeconfig
+charts/*.tgz
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Docker
+docker-data/
+
+# Misc
+.tmp/
+tmp/
+*.tar.gz
+*.zip
