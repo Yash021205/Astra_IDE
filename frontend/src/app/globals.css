@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { height: 100%; background: #020617; }
+
+.monaco-host { height: 100%; width:  100%; }
+
+/* ── Aurora background ──────────────────────────────────────────────────── */
+.aurora-layer {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.6;
+  pointer-events: none;
+  will-change: transform;
+}
+.aurora-1 {
+  background: radial-gradient(circle at 30% 30%, #3b82f6, transparent 60%);
+  animation: aurora-drift-1 18s ease-in-out infinite alternate;
+}
+.aurora-2 {
+  background: radial-gradient(circle at 70% 60%, #a855f7, transparent 60%);
+  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+}
+.aurora-3 {
+  background: radial-gradient(circle at 50% 80%, #ec4899, transparent 55%);
+  animation: aurora-drift-3 26s ease-in-out infinite alternate;
+  opacity: 0.4;
+}
+.aurora-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(255,255,255,0.15) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.10) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+@keyframes aurora-drift-1 {
+  0%   { transform: translate(0,    0)    scale(1.0); }
+  100% { transform: translate(8%, -6%)    scale(1.15); }
+}
+@keyframes aurora-drift-2 {
+  0%   { transform: translate(0,    0)    scale(1.1); }
+  100% { transform: translate(-10%, 8%)   scale(0.95); }
+}
+@keyframes aurora-drift-3 {
+  0%   { transform: translate(0,    0)    scale(0.9); }
+  100% { transform: translate(6%, -12%)   scale(1.2); }
+}
+
+/* ── Conic gradient spin (used in HoverBorderGradient) ──────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Yjs cursor names ───────────────────────────────────────────────────── */
+.yRemoteSelection {
+  background-color: rgba(80, 80, 80, 0.25);
+}
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  height: 100%;
+  box-sizing: border-box;
+}
+.yRemoteSelectionHead::after {
+  position: absolute;
+  content: ' ';
+  border: 3px solid currentColor;
+  border-radius: 4px;
+  left: -4px;
+  top: -5px;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
