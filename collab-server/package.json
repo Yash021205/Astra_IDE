@@ -1,0 +1,19 @@
+{
+  "name": "astra-collab-server",
+  "version": "0.1.0",
+  "description": "y-websocket relay for ASTRA-IDE collaborative editing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "node server.js"
+  },
+  "dependencies": {
+    "ws":          "^8.18.0",
+    "y-websocket": "^2.0.4",
+    "yjs":         "^13.6.20",
+    "lib0":        "^0.2.99"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
