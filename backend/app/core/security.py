@@ -8,7 +8,10 @@ from passlib.context import CryptContext
 from app.core.config import get_settings
 
 settings = get_settings()
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pbkdf2_sha256 (pure-Python, in passlib core): avoids the passlib↔bcrypt-4.x
+# incompatibility (bcrypt 4.1+ raises on its >72-byte self-test) and bcrypt's
+# 72-byte password cap, while staying a strong, salted, work-factored hash.
+_pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(plain_password: str) -> str:
