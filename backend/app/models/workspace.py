@@ -34,6 +34,9 @@ class Workspace(Base):
     pod_name:        Mapped[str]      = mapped_column(String(128), default="")
     yjs_room:        Mapped[str]      = mapped_column(String(64), default="")
     initial_code:    Mapped[str]      = mapped_column(Text, default="")
+    forked_from_id:  Mapped[int]      = mapped_column(Integer, nullable=True)  # source workspace if forked
+    frozen:          Mapped[bool]     = mapped_column(Boolean, default=False)  # read-only lock (settings)
+    shared_excludes: Mapped[str]      = mapped_column(Text, default="")        # JSON list of paths hidden from members
     owner_id:        Mapped[int]      = mapped_column(ForeignKey("users.id"))
     created_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -59,3 +62,21 @@ class WorkspaceMember(Base):
 
     workspace = relationship("Workspace", back_populates="members")
     user      = relationship("User")
+
+
+class WorkspaceEdit(Base):
+    """
+    Change-history log (Google-Docs style). One row per file save, recording who
+    saved, which file, and how many lines changed. Only the workspace owner can
+    read the history; forks accumulate their own (separate workspace_id).
+    """
+    __tablename__ = "workspace_edits"
+
+    id:           Mapped[int]      = mapped_column(primary_key=True, index=True)
+    workspace_id: Mapped[int]      = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    user_id:      Mapped[int]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    username:     Mapped[str]      = mapped_column(String(64), default="")
+    path:         Mapped[str]      = mapped_column(String(400), default="")
+    lines_added:  Mapped[int]      = mapped_column(Integer, default=0)
+    lines_removed: Mapped[int]     = mapped_column(Integer, default=0)
+    created_at:   Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
