@@ -1,0 +1,35 @@
+# Karmada PropagationPolicy for cross-cluster workspace placement.
+# Default split: 70% to cluster-a, 30% to cluster-b. The PPO scheduler
+# dynamically overrides these weights based on:
+#   - Real-time carbon intensity per region
+#   - Per-cluster current utilization
+#   - Network latency from user's geo region
+
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: workspace-policy
+  namespace: astra-ide
+spec:
+  resourceSelectors:
+  - apiVersion: v1
+    kind: Pod
+    labelSelector:
+      matchLabels:
+        app: astra-workspace
+  placement:
+    clusterAffinity:
+      clusterNames:
+      - cluster-a
+      - cluster-b
+    replicaScheduling:
+      replicaSchedulingType: Divided
+      replicaDivisionPreference: Weighted
+      weightPreference:
+        staticClusterWeight:
+        - targetCluster:
+            clusterNames: [cluster-a]
+          weight: 70
+        - targetCluster:
+            clusterNames: [cluster-b]
+          weight: 30

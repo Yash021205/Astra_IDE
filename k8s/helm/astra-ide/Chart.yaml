@@ -1,0 +1,17 @@
+apiVersion: v2
+name: astra-ide
+description: Adaptive Scheduling & Telemetry-driven Resource-aware Cloud IDE
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - cloud-ide
+  - drl
+  - ppo
+  - ebpf
+  - sandboxing
+  - crdt
+home: https://github.com/PrasannaMishra001/astra-ide
+maintainers:
+  - name: Prasanna Mishra
+    email: mishra.prasanna838@gmail.com

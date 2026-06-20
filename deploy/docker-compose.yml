@@ -1,0 +1,100 @@
+# Local development stack for ASTRA-IDE.
+# All four services + PostgreSQL + Redis + MinIO in one `docker compose up`.
+#
+# Hostnames inside the network:
+#   backend         FastAPI    :8000
+#   frontend        Next.js    :3000
+#   collab          y-websocket :1234
+#   postgres        Postgres   :5432
+#   redis           Redis      :6379
+#   minio           MinIO      :9000  (console :9001)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     astra
+      POSTGRES_PASSWORD: astra_dev
+      POSTGRES_DB:       astra
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astra"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     admin
+      MINIO_ROOT_PASSWORD: admin12345
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    # Loads carbon token + any other secrets from backend/.env (gitignored).
+    # Values in `environment:` below take precedence over this file.
+    env_file:
+      - ../backend/.env
+    environment:
+      DATABASE_URL:    postgresql+psycopg2://astra:astra_dev@postgres:5432/astra
+      REDIS_URL:       redis://redis:6379/0
+      JWT_SECRET:      dev-secret-change-me-in-production
+      COLLAB_WS_URL:   ws://collab:1234
+      MINIO_ENDPOINT:  http://minio:9000
+      CORS_ORIGINS:    '["http://localhost:3000"]'
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+      minio:    { condition: service_healthy }
+
+  collab:
+    build:
+      context: ../collab-server
+      dockerfile: Dockerfile
+    ports: ["1234:1234"]
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      # Next.js bakes rewrites + NEXT_PUBLIC_* into the production build, so
+      # we MUST pass these as build-args (not just runtime env vars).
+      # Set PUBLIC_HOST to the public IP/domain that users hit in their browser:
+      #   PUBLIC_HOST=34.47.224.18 docker compose up -d --build frontend
+      args:
+        BACKEND_URL:                http://backend:8000
+        NEXT_PUBLIC_COLLAB_WS_URL:  ws://${PUBLIC_HOST:-localhost}:1234
+    environment:
+      # Same values also set at runtime so server-side rewrites can read them.
+      BACKEND_URL:                http://backend:8000
+      NEXT_PUBLIC_COLLAB_WS_URL:  ws://${PUBLIC_HOST:-localhost}:1234
+    ports: ["3000:3000"]
+    depends_on:
+      - backend
+      - collab
+
+volumes:
+  postgres_data:
+  minio_data:

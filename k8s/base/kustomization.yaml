@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: astra-ide
+resources:
+  - namespace.yaml
+  - runtime-classes.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - collab-deployment.yaml
+  - keda-scaledobject.yaml
+  - eBPF-tetragon-policy.yaml

@@ -1,0 +1,23 @@
+# KEDA ScaledObject — auto-scales the backend based on workspace queue depth.
+# When the Prometheus metric `workspace_pending_queue_total` exceeds threshold,
+# more backend replicas are spawned.
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: backend-queue-scaler
+  namespace: astra-ide
+spec:
+  scaleTargetRef:
+    name: backend
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  pollingInterval: 30
+  cooldownPeriod:  60
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName:    workspace_pending_queue
+      threshold:     "5"
+      query:         workspace_pending_queue_total{namespace="astra-ide"}

@@ -1,0 +1,75 @@
+# Default values for the astra-ide chart.
+# Override per-environment via -f values-prod.yaml or --set commands.
+
+global:
+  imageRegistry: ghcr.io/prasannamishra001
+  imageTag:      latest
+  imagePullPolicy: IfNotPresent
+
+backend:
+  replicas: 2
+  image: astra-ide-backend
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  service:
+    type: ClusterIP
+    port: 8000
+  env:
+    DATABASE_URL: postgresql+psycopg2://astra:astra@postgres:5432/astra
+    REDIS_URL:    redis://redis:6379/0
+
+frontend:
+  replicas: 2
+  image: astra-ide-frontend
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  service:
+    type: ClusterIP
+    port: 3000
+
+collab:
+  replicas: 1
+  image: astra-ide-collab
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+  service:
+    type: ClusterIP
+    port: 1234
+
+ingress:
+  enabled: false
+  className: traefik
+  hosts:
+    - host: astra-ide.local
+      paths:
+        - path: /
+          service: frontend
+          port: 3000
+        - path: /api
+          service: backend
+          port: 8000
+
+postgres:
+  enabled: true
+  auth:
+    username: astra
+    password: astra
+    database: astra
+  persistence:
+    enabled: true
+    size: 5Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+
+minio:
+  enabled: true
+  rootUser:     admin
+  rootPassword: admin12345
+  persistence:
+    enabled: true
+    size: 10Gi

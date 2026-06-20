@@ -1,0 +1,53 @@
+# Template for a per-user workspace Pod.
+# At runtime, the backend's scheduler will:
+#   1. Compute risk score → choose runtimeClassName (runc / gvisor / firecracker)
+#   2. Substitute placeholders with workspace-specific values
+#   3. Submit to the cluster (or Karmada for multi-cluster placement)
+#
+# Placeholder syntax: ${WORKSPACE_ID}, ${USER_ID}, ${LANGUAGE}, ${SANDBOX_TIER}, etc.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: workspace-${WORKSPACE_ID}
+  namespace: astra-ide
+  labels:
+    app: astra-workspace
+    user-id:      "${USER_ID}"
+    workspace-id: "${WORKSPACE_ID}"
+    language:     "${LANGUAGE}"
+    sandbox-tier: "${SANDBOX_TIER}"
+spec:
+  runtimeClassName: ${SANDBOX_TIER}   # runc | gvisor | firecracker
+  restartPolicy: Never
+  containers:
+  - name: ide
+    image: codercom/code-server:latest
+    args:
+      - "--auth=none"
+      - "--bind-addr=0.0.0.0:8080"
+      - "/home/coder/workspace"
+    ports:
+      - containerPort: 8080
+        name: http
+    env:
+    - name: WORKSPACE_ID
+      value: "${WORKSPACE_ID}"
+    - name: USER_ID
+      value: "${USER_ID}"
+    resources:
+      requests:
+        cpu:    "${CPU_REQUEST}"
+        memory: "${MEMORY_REQUEST}Mi"
+      limits:
+        cpu:    "${CPU_LIMIT}"
+        memory: "${MEMORY_LIMIT}Mi"
+    volumeMounts:
+    - name: workspace-storage
+      mountPath: /home/coder/workspace
+
+  # LSP sidecars are appended dynamically based on language
+
+  volumes:
+  - name: workspace-storage
+    persistentVolumeClaim:
+      claimName: workspace-${WORKSPACE_ID}-pvc

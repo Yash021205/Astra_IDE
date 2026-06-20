@@ -1,0 +1,39 @@
+# RuntimeClasses for the adaptive sandboxing tiers.
+# - runc:         default Docker runtime; lowest overhead.
+# - gvisor:       Google's user-space kernel; medium isolation.
+# - firecracker:  AWS microVM, accessed via Kata Containers; strongest isolation.
+#
+# The backend's workspace_service writes the chosen tier into the Pod's
+# spec.runtimeClassName field at creation time.
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: runc
+handler: runc
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc
+overhead:
+  podFixed:
+    cpu: "30m"
+    memory: "32Mi"
+scheduling:
+  nodeSelector:
+    sandbox.astra-ide.io/gvisor: "true"
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: firecracker
+handler: kata-fc
+overhead:
+  podFixed:
+    cpu: "50m"
+    memory: "10Mi"
+scheduling:
+  nodeSelector:
+    sandbox.astra-ide.io/firecracker: "true"

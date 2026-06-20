@@ -1,0 +1,34 @@
+# Tetragon TracingPolicy that captures kernel-level events for the PPO scheduler.
+# Events flow: kernel → eBPF → Tetragon → ring buffer → telemetry daemon → PPO state.
+#
+# We monitor:
+#   - sched_switch:    measures run-queue length per CPU
+#   - sys_enter_*:     syscall rate per process (anomaly detection)
+#   - mm_page_fault:   memory pressure signal
+
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: astra-scheduler-telemetry
+spec:
+  kprobes:
+  - call:    sched_switch
+    syscall: false
+    args:
+    - index: 0
+      type:  int
+    - index: 1
+      type:  int
+
+  - call:    handle_mm_fault
+    syscall: false
+    args:
+    - index: 0
+      type:  uint64
+
+  tracepoints:
+  - subsystem: syscalls
+    event:     sys_enter_execve
+    args:
+    - index: 0
+      type:  string
