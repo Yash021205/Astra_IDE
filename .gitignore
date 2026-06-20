@@ -5,6 +5,16 @@ docs/EVAL_*.md
 docs-private/
 notes-*.md
 
+# Research paper PDFs — too big for git, fetched manually via docs/research/papers/README.md
+docs/research/papers/*.pdf
+docs/research/papers/*.txt
+
+# Benchmark datasets + run outputs — code/harness is committed, data is fetched locally
+benchmarks/**/data/
+benchmarks/**/results/
+# Personal working notes — paper extraction, impl mapping, reading guides (not shared)
+docs/research/notes/
+
 backend/__pycache__/
 backend/build/
 backend/dist/
@@ -94,7 +104,7 @@ tensorboard/
 data/raw/
 data/processed/
 checkpoints/
-
+data/
 # Kubernetes / Helm
 *.kubeconfig
 charts/*.tgz
@@ -113,3 +123,13 @@ docker-data/
 tmp/
 *.tar.gz
 *.zip
+
+# Per-workspace file storage (cloned repos, user files)
+backend/workspace_data/
+
+# Personal presentation / planning guides (keep local, never commit)
+docs/PRESENTATION.md
+docs/PRESENTATION-SCRIPT.md
+docs/ARCHITECTURE-DIAGRAMS.md
+docs/OAUTH-SETUP.md
+docs/TECH-STACK-STATUS.md

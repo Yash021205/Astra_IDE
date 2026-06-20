@@ -7,11 +7,20 @@ A cloud development environment combining **DRL-PPO scheduling**, **eBPF observa
 **multi-cluster Karmada federation**, **carbon-aware scheduling**, and **Yjs CRDT
 collaboration** in one open research platform.
 
-Live demo: **http://34.47.224.18:3000**
 
 ---
-## Contribution
-Developed as part of a collaborative project; repository reflects my implementation of project and ongoing experimentation.
+
+## Team
+
+Sorted by roll number.
+
+| Roll | Name | Role |
+|---|---|---|
+| 2023IMT-059 | **Prasanna Mishra**  
+| 2023IMT-084 | **Udit Srivastava**        
+| 2023IMT-087 | **Yash Wani**              
+
+---
 
 ## Repository layout
 
@@ -52,18 +61,18 @@ astra-ide/
 ### 2. Clone
 
 ```bash
-git clone https://github.com/PrasannaMishra001/astra-ide.git
-cd astra-ide
+git clone https://github.com/Yash021205/Astra_IDE.git
+cd Astra_IDE
 ```
 
-### 3. Quickest path — full stack via Docker Compose (5 min)
+### 3. Quickest path: full stack via Docker Compose (one command)
+
+With only **Docker Desktop + Git** installed, a fresh clone runs the entire
+platform (Postgres + Redis + MinIO + backend + collab + frontend) with no config:
 
 ```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env: paste your electricityMaps token (or leave blank for fallback)
-
 cd deploy
-docker compose up -d --build
+docker compose up --build       # first build ~5 min; then ~20s on restarts
 ```
 
 Open:
@@ -71,7 +80,12 @@ Open:
 - Backend Swagger: <http://localhost:8000/api/v1/docs>
 - Collab WS health: <http://localhost:1234/healthz>
 
-Stop: `docker compose down`.
+No `.env` is required: optional features (electricityMaps carbon token, Google
+OAuth) fall back gracefully when unset. To enable them, copy
+`backend/.env.example` to `backend/.env` and fill in the values before bringing
+the stack up.
+
+Stop: `docker compose down`  ·  reset data too: `docker compose down -v`.
 
 ### 4. Native dev (faster iteration, hot reload)
 
