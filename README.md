@@ -10,6 +10,8 @@ collaboration** in one open research platform.
 Live demo: **http://34.47.224.18:3000**
 
 ---
+## Contribution
+Developed as part of a collaborative project; repository reflects my implementation of project and ongoing experimentation.
 
 ## Repository layout
 
