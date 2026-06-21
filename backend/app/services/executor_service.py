@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -31,6 +32,23 @@ from dataclasses import dataclass
 # Hard limits
 TIMEOUT_SECONDS = 5
 MAX_OUTPUT_BYTES = 10 * 1024     # 10 KB per stream
+
+
+def _resolve_python() -> str:
+    """Pick a working Python interpreter: python3 (Linux containers) → python
+    (Windows dev) → the backend's own interpreter. The Windows `python3` is a
+    Store stub that returns 9009, so we probe rather than assume."""
+    for cand in (sys.executable, "python3", "python"):
+        try:
+            if cand and subprocess.run([cand, "--version"], capture_output=True,
+                                       timeout=5).returncode == 0:
+                return cand
+        except Exception:
+            continue
+    return sys.executable
+
+
+PYTHON = _resolve_python()
 
 
 @dataclass
@@ -74,9 +92,14 @@ def _run(argv: list[str], stdin: str | None, cwd: str) -> ExecutionResult:
         stdout, stderr = proc.communicate(input=stdin or "", timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         timed_out = True
+        # POSIX: kill the whole process group so spawned children die too.
+        # Non-POSIX (no os.killpg, e.g. Windows dev box) falls back to proc.kill().
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+            if hasattr(os, "killpg"):
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            else:
+                proc.kill()
+        except (ProcessLookupError, PermissionError, OSError):
             pass
         stdout, stderr = proc.communicate()
 
@@ -100,17 +123,17 @@ def _run(argv: list[str], stdin: str | None, cwd: str) -> ExecutionResult:
 # ── Language adapters ───────────────────────────────────────────────────────
 
 def _execute_python(code: str, stdin: str | None) -> ExecutionResult:
-    with tempfile.TemporaryDirectory(prefix="astra-py-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="astra-py-", ignore_cleanup_errors=True) as tmpdir:
         src = os.path.join(tmpdir, "main.py")
         with open(src, "w", encoding="utf-8") as f:
             f.write(code)
-        result = _run(["python3", src], stdin, tmpdir)
+        result = _run([PYTHON, src], stdin, tmpdir)
         result.language = "python"
         return result
 
 
 def _execute_cpp(code: str, stdin: str | None) -> ExecutionResult:
-    with tempfile.TemporaryDirectory(prefix="astra-cpp-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="astra-cpp-", ignore_cleanup_errors=True) as tmpdir:
         src = os.path.join(tmpdir, "main.cpp")
         binp = os.path.join(tmpdir, "main")
         with open(src, "w", encoding="utf-8") as f:
@@ -132,7 +155,7 @@ def _execute_cpp(code: str, stdin: str | None) -> ExecutionResult:
 
 
 def _execute_javascript(code: str, stdin: str | None) -> ExecutionResult:
-    with tempfile.TemporaryDirectory(prefix="astra-js-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="astra-js-", ignore_cleanup_errors=True) as tmpdir:
         src = os.path.join(tmpdir, "main.js")
         with open(src, "w", encoding="utf-8") as f:
             f.write(code)
@@ -142,7 +165,7 @@ def _execute_javascript(code: str, stdin: str | None) -> ExecutionResult:
 
 
 def _execute_bash(code: str, stdin: str | None) -> ExecutionResult:
-    with tempfile.TemporaryDirectory(prefix="astra-sh-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="astra-sh-", ignore_cleanup_errors=True) as tmpdir:
         src = os.path.join(tmpdir, "main.sh")
         with open(src, "w", encoding="utf-8") as f:
             f.write(code)
@@ -172,7 +195,15 @@ def supported_languages() -> list[str]:
 
 
 def execute(language: str, code: str, stdin: str | None = None) -> ExecutionResult:
-    """Run user code in the requested language and return the result."""
+    """
+    Run user code in the requested language and return the result.
+
+    Pre-execution interception (Paper 1, Yan arXiv:2512.12806 §4.2): the policy
+    engine classifies the code; UNSAFE (destructive / direct host-escape) code is
+    BLOCKED and never executed. The full transactional snapshot/rollback layer
+    activates once workspaces have persistent state (MinIO ticket); for the
+    current ephemeral-temp-dir model the interception layer is the active guard.
+    """
     lang = language.lower().strip()
     runner = _DISPATCH.get(lang)
     if runner is None:
@@ -182,6 +213,20 @@ def execute(language: str, code: str, stdin: str | None = None) -> ExecutionResu
             stdout="",
             stderr=f"Language '{language}' is not supported. Available: "
                    + ", ".join(supported_languages()),
+            runtime_ms=0,
+            timeout=False,
+            truncated=False,
+        )
+
+    # Policy interception — block destructive / escape-grade code before it runs.
+    from app.services import transactional_executor as _tx
+    if _tx.classify(code) is _tx.Policy.UNSAFE:
+        return ExecutionResult(
+            language=lang,
+            exit_code=-3,
+            stdout="",
+            stderr="Policy Violation: destructive or host-escape command "
+                   "blocked before execution (sandbox policy, Paper 1 §4.2).",
             runtime_ms=0,
             timeout=False,
             truncated=False,

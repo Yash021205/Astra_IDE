@@ -50,6 +50,15 @@ W_OVERLOAD    = 0.10
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _use_pfmppo() -> bool:
+    """Check if PF-MPPO scheduler is enabled in settings."""
+    try:
+        from app.core.config import get_settings
+        return get_settings().scheduler_algorithm == "pfmppo"
+    except Exception:
+        return False
+
+
 def decide_placement(
     workspace: Workspace,
     *,
@@ -61,6 +70,30 @@ def decide_placement(
     Records a `scheduler` event capturing the decision + reasoning so it
     shows up on the live activity feed.
     """
+    # PF-MPPO path: use trained model if enabled and available
+    if _use_pfmppo():
+        try:
+            from app.services.pfmppo_inference import get_inference_service
+            service = get_inference_service()
+            if service is not None:
+                result = service.decide_placement(workspace)
+                if result is not None:
+                    cluster_state.increment_pods(result.cluster_id, result.node_name, +1)
+                    events_service.record(
+                        kind="scheduler",
+                        title=f"PF-MPPO placed {workspace.name} on {result.node_name}",
+                        detail=(
+                            f"score={result.score:.3f} | {result.reasoning} | "
+                            f"sandbox={result.sandbox_tier} | risk={workspace.risk_score:.2f}"
+                        ),
+                        workspace_id=workspace.id,
+                        cluster_id=result.cluster_id,
+                        node_name=result.node_name,
+                    )
+                    return result
+        except Exception:
+            pass  # Fall through to heuristic
+
     candidates: List[Tuple[str, str, float, str]] = []
 
     for cluster in cluster_state.all_clusters():

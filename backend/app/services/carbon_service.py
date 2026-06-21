@@ -76,6 +76,12 @@ class CarbonService:
         if cached and (time.time() - cached.timestamp) < self._ttl:
             return CarbonReading(**{**cached.__dict__, "source": "cache"})
 
+        # Cross-replica cache (Redis when available) so all API workers share a
+        # reading and we stay within the electricityMaps quota.
+        shared = self._shared_get(zone)
+        if shared is not None:
+            return shared
+
         if not self._token:
             return self._fallback(zone, reason="no token configured")
 
@@ -103,7 +109,29 @@ class CarbonService:
             timestamp=time.time(),
         )
         self._cache[zone] = reading
+        self._shared_set(reading)
         return reading
+
+    # ── shared cross-replica cache (Redis or in-memory fallback) ─────────────
+    def _shared_get(self, zone: str) -> Optional[CarbonReading]:
+        import json
+        from app.services.cache import get_cache
+        raw = get_cache().get(f"carbon:{zone}")
+        if not raw:
+            return None
+        try:
+            d = json.loads(raw)
+        except ValueError:
+            return None
+        if (time.time() - d.get("timestamp", 0)) >= self._ttl:
+            return None
+        return CarbonReading(**{**d, "source": "cache"})
+
+    def _shared_set(self, reading: CarbonReading) -> None:
+        import json
+        from app.services.cache import get_cache
+        get_cache().set(f"carbon:{reading.zone}", json.dumps(reading.__dict__),
+                        ttl=self._ttl)
 
     def get_normalized(self, zone: Optional[str] = None) -> float:
         """Return intensity normalized to roughly [0, 1] for PPO state vector."""

@@ -135,6 +135,8 @@ def list_members(db: Session, workspace_id: int) -> List[dict]:
     members: List[dict] = [{
         "user_id":  workspace.owner.id,
         "username": workspace.owner.username,
+        "email":    workspace.owner.email,
+        "avatar_url": getattr(workspace.owner, "avatar_url", None),
         "role":     "owner",
         "added_at": workspace.created_at,
     }]
@@ -142,6 +144,8 @@ def list_members(db: Session, workspace_id: int) -> List[dict]:
         members.append({
             "user_id":  m.user.id,
             "username": m.user.username,
+            "email":    m.user.email,
+            "avatar_url": getattr(m.user, "avatar_url", None),
             "role":     m.role,
             "added_at": m.added_at,
         })

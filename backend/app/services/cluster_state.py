@@ -31,6 +31,14 @@ class Node:
     active_pods:   int   = 0
     # supported sandbox tiers on this node (labels in real K8s)
     sandboxes:     List[str] = field(default_factory=lambda: ["runc", "gvisor", "firecracker"])
+    # PF-MPPO fields (Eq 2): VM capacity and power characteristics
+    cpu_cap:         float = 4.0
+    mem_cap:         float = 8192.0
+    disk_cap:        float = 102400.0
+    bandwidth_mbps:  float = 1000.0
+    proc_rate_mbps:  float = 200.0
+    power_static_w:  float = 11.0
+    power_max_w:     float = 200.0
 
 
 @dataclass
@@ -46,26 +54,38 @@ class Cluster:
 
 _lock = threading.RLock()
 
+def _nodes(cluster_id: str, prefix: str, specs: list[tuple[float, float, float]]) -> Dict[str, Node]:
+    out: Dict[str, Node] = {}
+    for i, (cpu, mem, rq) in enumerate(specs, start=1):
+        name = f"node-{prefix}-{i}"
+        out[name] = Node(cluster_id=cluster_id, name=name,
+                         cpu_util=cpu, memory_util=mem, run_queue_len=rq)
+    return out
+
+
+# Four federated member clusters (Karmada). Carbon intensity varies by region so
+# the carbon-aware policy (B6) has something to prefer; the PPO scheduler (B1)
+# sees all of them as one pool.
 _CLUSTERS: Dict[str, Cluster] = {
     "cluster-a": Cluster(
         id="cluster-a", location="DK-DK1 (Denmark West)", zone="DK-DK1",
-        carbon_gco2=100.0,
-        nodes={
-            "node-a-1": Node(cluster_id="cluster-a", name="node-a-1",
-                             cpu_util=0.25, memory_util=0.35, run_queue_len=1.2),
-            "node-a-2": Node(cluster_id="cluster-a", name="node-a-2",
-                             cpu_util=0.40, memory_util=0.50, run_queue_len=2.0),
-        },
+        carbon_gco2=95.0,
+        nodes=_nodes("cluster-a", "a", [(0.25, 0.35, 1.2), (0.40, 0.50, 2.0), (0.32, 0.41, 1.5)]),
     ),
     "cluster-b": Cluster(
         id="cluster-b", location="IN-NO (India North)", zone="IN-NO",
         carbon_gco2=710.0,
-        nodes={
-            "node-b-1": Node(cluster_id="cluster-b", name="node-b-1",
-                             cpu_util=0.20, memory_util=0.30, run_queue_len=0.8),
-            "node-b-2": Node(cluster_id="cluster-b", name="node-b-2",
-                             cpu_util=0.55, memory_util=0.45, run_queue_len=3.1),
-        },
+        nodes=_nodes("cluster-b", "b", [(0.20, 0.30, 0.8), (0.55, 0.45, 3.1), (0.38, 0.52, 1.9)]),
+    ),
+    "cluster-c": Cluster(
+        id="cluster-c", location="US-CAL (California)", zone="US-CAL-CISO",
+        carbon_gco2=280.0,
+        nodes=_nodes("cluster-c", "c", [(0.30, 0.38, 1.4), (0.46, 0.55, 2.3)]),
+    ),
+    "cluster-d": Cluster(
+        id="cluster-d", location="SG (Singapore)", zone="SG",
+        carbon_gco2=430.0,
+        nodes=_nodes("cluster-d", "d", [(0.22, 0.33, 1.0), (0.51, 0.49, 2.7)]),
     ),
 }
 
