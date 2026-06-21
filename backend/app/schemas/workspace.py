@@ -1,7 +1,10 @@
 """Pydantic schemas for workspace endpoints."""
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from typing import Literal, Optional, List
+from pydantic import BaseModel, Field, field_serializer
+
+# Manual sandbox-tier pin. None = adaptive (risk-scored) selection.
+SandboxOverride = Optional[Literal["runc", "gvisor", "firecracker"]]
 
 
 class WorkspaceCreate(BaseModel):
@@ -12,11 +15,16 @@ class WorkspaceCreate(BaseModel):
     cpu_request:      float = Field(default=0.5, gt=0, le=8)
     memory_request:   int   = Field(default=512, gt=0, le=16384)
     initial_code:     str   = ""
+    # None = "Auto" (adaptive risk scoring); otherwise pin the tier explicitly.
+    sandbox_override: SandboxOverride = None
 
 
 class WorkspaceUpdate(BaseModel):
     name:   Optional[str] = None
     status: Optional[str] = None
+    # Re-pin the sandbox tier after creation (owner action).
+    sandbox_override: SandboxOverride = None
+    frozen: Optional[bool] = None          # read-only lock (settings panel)
 
 
 class WorkspaceOut(BaseModel):
@@ -35,9 +43,19 @@ class WorkspaceOut(BaseModel):
     pod_name:         str
     yjs_room:         str
     owner_id:         int
+    forked_from_id:   Optional[int] = None
+    frozen:           bool = False
     created_at:       datetime
     updated_at:       datetime
     last_active_at:   datetime
+
+    # DB stores naive UTC; serialize timezone-aware so browsers in any locale
+    # compute correct relative times (was showing "+5h30m" in IST).
+    @field_serializer("created_at", "updated_at", "last_active_at")
+    def _utc(self, v: datetime) -> str:
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
 
     class Config:
         from_attributes = True
@@ -56,10 +74,12 @@ class ShareRequest(BaseModel):
 
 
 class MemberOut(BaseModel):
-    user_id:  int
-    username: str
-    role:     str
-    added_at: datetime
+    user_id:    int
+    username:   str
+    email:      Optional[str] = None
+    avatar_url: Optional[str] = None
+    role:       str
+    added_at:   datetime
 
     class Config:
         from_attributes = True
@@ -68,6 +88,30 @@ class MemberOut(BaseModel):
 class MemberList(BaseModel):
     total: int
     items: List[MemberOut]
+
+
+# ── Sharing exclusions + edit history ────────────────────────────────────────
+
+class ExcludesUpdate(BaseModel):
+    excludes: List[str] = Field(default_factory=list)
+
+
+class EditOut(BaseModel):
+    username:      str
+    path:          str
+    lines_added:   int
+    lines_removed: int
+    created_at:    datetime
+
+    @field_serializer("created_at")
+    def _utc(self, v: datetime) -> str:
+        from datetime import timezone
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+
+    class Config:
+        from_attributes = True
 
 
 # ── Execution ────────────────────────────────────────────────────────────────

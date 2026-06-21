@@ -1,7 +1,7 @@
 """Pydantic schemas for the events + metrics APIs."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class EventOut(BaseModel):
@@ -13,6 +13,14 @@ class EventOut(BaseModel):
     workspace_id: int
     cluster_id:   str
     node_name:    str
+
+    # DB stores naive UTC; serialize timezone-aware so browsers in any locale
+    # compute correct relative times (was rendering "5h ago" in IST).
+    @field_serializer("timestamp")
+    def _utc(self, v: datetime) -> str:
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
 
     class Config:
         from_attributes = True
