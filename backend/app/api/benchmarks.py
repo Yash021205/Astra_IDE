@@ -12,14 +12,19 @@ cluster snapshot, and aggregates latency / utilization / energy stats.
 """
 from __future__ import annotations
 
+import json
 import random
 import statistics
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.models import User
+from app.db.session import get_db
+from app.models import User, BenchmarkRun
 from app.schemas.event import BenchmarkRow, BenchmarkReport
 from app.services import cluster_state
 from app.services import scheduler_service
@@ -147,11 +152,15 @@ def _percentile(values: list[float], p: float) -> float:
 def run_benchmark(
     n_jobs: int = Query(200, ge=20, le=2000, description="Number of synthetic workloads"),
     seed:   int = Query(42,  description="RNG seed for reproducibility"),
-    _user:  User = Depends(get_current_user),
+    user:   User = Depends(get_current_user),
+    db:     Session = Depends(get_db),
 ) -> BenchmarkReport:
     workload   = _make_workload(n_jobs, seed)
     algorithms = ["ppo", "least_loaded", "round_robin", "random", "fifo"]
     rows = [_simulate(alg, workload) for alg in algorithms]
+
+    _persist_run(db, user, n_jobs, seed, rows)
+
     return BenchmarkReport(
         description=(
             f"Replay of {n_jobs} synthetic workloads against the current "
@@ -166,3 +175,56 @@ def run_benchmark(
             "nodes":       str(len(cluster_state.all_nodes())),
         },
     )
+
+
+# ── Run history (observability: log of previous runs) ────────────────────────
+
+class BenchmarkRunOut(BaseModel):
+    id:               int
+    created_at:       datetime
+    username:         str
+    n_jobs:           int
+    seed:             int
+    winner:           str
+    ppo_latency_ms:   float
+    ppo_util_pct:     float
+    ppo_balance:      float
+    ppo_sla:          int
+    latency_gain_pct: float
+
+    class Config:
+        from_attributes = True
+
+
+def _persist_run(db: Session, user: User, n_jobs: int, seed: int, rows: list[BenchmarkRow]) -> None:
+    ppo = next((r for r in rows if r.algorithm == "ppo"), None)
+    if ppo is None:
+        return
+    baselines = [r for r in rows if r.algorithm != "ppo"]
+    base_lat = statistics.mean(r.avg_latency_ms for r in baselines) if baselines else ppo.avg_latency_ms
+    gain = ((base_lat - ppo.avg_latency_ms) / base_lat * 100) if base_lat else 0.0
+    # winner = lowest avg latency
+    winner = min(rows, key=lambda r: r.avg_latency_ms).algorithm
+    try:
+        db.add(BenchmarkRun(
+            user_id=user.id, username=user.username, n_jobs=n_jobs, seed=seed,
+            winner=winner,
+            ppo_latency_ms=ppo.avg_latency_ms, ppo_util_pct=ppo.utilization_pct,
+            ppo_balance=ppo.balance_score, ppo_sla=ppo.sla_violations,
+            latency_gain_pct=round(gain, 1),
+            rows_json=json.dumps([r.model_dump() for r in rows]),
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+@router.get("/history", response_model=List[BenchmarkRunOut])
+def benchmark_history(
+    limit: int = Query(20, ge=1, le=100),
+    _user: User = Depends(get_current_user),
+    db:    Session = Depends(get_db),
+) -> List[BenchmarkRun]:
+    return (db.query(BenchmarkRun)
+              .order_by(BenchmarkRun.created_at.desc())
+              .limit(limit).all())

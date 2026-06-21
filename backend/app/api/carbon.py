@@ -19,6 +19,8 @@ def get_intensity(
     is exhausted.
     """
     reading = get_carbon_service().get_intensity(zone)
+    from app.core.metrics import CARBON_INTENSITY            # B6 metric for Grafana
+    CARBON_INTENSITY.labels(reading.zone).set(reading.carbon_intensity)
     return {
         "zone":             reading.zone,
         "carbon_intensity": reading.carbon_intensity,
