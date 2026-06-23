@@ -184,6 +184,15 @@ if _GYM_AVAILABLE:
                 weights=self.reward_weights,
             )
 
+            # Sandbox-security penalty (report §6.1 ζ term; couples B1↔B4): a job
+            # whose risk needs a stronger sandbox than the chosen tier is
+            # under-isolated. Without this the agent would just pick runc (lowest
+            # latency) for everything. required tier = risk band (cf. risk_scorer).
+            risk = self.pending_job.risk_score
+            required_tier = 0 if risk < 0.30 else (1 if risk < 0.70 else 2)
+            if sandbox_tier < required_tier:
+                reward -= 3.0
+
             self._decay_load()
             self.step_count  += 1
             self.time_of_day = (self.time_of_day + 0.25) % 24.0
@@ -231,8 +240,12 @@ if _GYM_AVAILABLE:
             ))
 
         def _decay_load(self):
-            self.state.cpu_util       = np.clip(self.state.cpu_util       - 0.02, 0, 1)
-            self.state.memory_util    = np.clip(self.state.memory_util    - 0.02, 0, 1)
+            # Jobs complete and free resources. Decay must roughly match the mean
+            # per-step arrival (~1 job × cpu_req/4) so that GOOD load-balancing
+            # keeps the cluster healthy while piling onto one node saturates it —
+            # otherwise every policy saturates and placement quality is invisible.
+            self.state.cpu_util       = np.clip(self.state.cpu_util       - 0.07, 0, 1)
+            self.state.memory_util    = np.clip(self.state.memory_util    - 0.05, 0, 1)
             self.state.run_queue_len  = np.clip(self.state.run_queue_len  - 0.05, 0, 1)
             self.state.network_load   = np.clip(self.state.network_load   - 0.02, 0, 1)
             if self.state.warm_pool_count > 0 and self._rng.random() < 0.3:

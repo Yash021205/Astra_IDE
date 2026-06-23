@@ -1,0 +1,45 @@
+{
+  "description": "Default ASTRA cluster: 4 heterogeneous VMs",
+  "vms": [
+    {
+      "node_id": "vm_0",
+      "cpu_cap": 4.0,
+      "mem_cap": 8192.0,
+      "disk_cap": 102400.0,
+      "bandwidth_mbps": 1000.0,
+      "proc_rate_mbps": 200.0,
+      "power_static_w": 11.0,
+      "power_max_w": 200.0
+    },
+    {
+      "node_id": "vm_1",
+      "cpu_cap": 8.0,
+      "mem_cap": 16384.0,
+      "disk_cap": 204800.0,
+      "bandwidth_mbps": 2000.0,
+      "proc_rate_mbps": 400.0,
+      "power_static_w": 15.0,
+      "power_max_w": 350.0
+    },
+    {
+      "node_id": "vm_2",
+      "cpu_cap": 2.0,
+      "mem_cap": 4096.0,
+      "disk_cap": 51200.0,
+      "bandwidth_mbps": 500.0,
+      "proc_rate_mbps": 100.0,
+      "power_static_w": 8.0,
+      "power_max_w": 120.0
+    },
+    {
+      "node_id": "vm_3",
+      "cpu_cap": 16.0,
+      "mem_cap": 32768.0,
+      "disk_cap": 512000.0,
+      "bandwidth_mbps": 5000.0,
+      "proc_rate_mbps": 800.0,
+      "power_static_w": 20.0,
+      "power_max_w": 500.0
+    }
+  ]
+}

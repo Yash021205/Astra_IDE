@@ -1,0 +1,21 @@
+{
+  "description": "Large cluster: 16 balanced VMs for high-scale workloads",
+  "vms": [
+    {"node_id": "vm_0",  "cpu_cap": 4.0,  "mem_cap": 8192.0,  "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 11.0, "power_max_w": 200.0},
+    {"node_id": "vm_1",  "cpu_cap": 4.0,  "mem_cap": 8192.0,  "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 11.0, "power_max_w": 200.0},
+    {"node_id": "vm_2",  "cpu_cap": 8.0,  "mem_cap": 16384.0, "disk_cap": 204800.0, "bandwidth_mbps": 2000.0, "proc_rate_mbps": 400.0, "power_static_w": 15.0, "power_max_w": 350.0},
+    {"node_id": "vm_3",  "cpu_cap": 8.0,  "mem_cap": 16384.0, "disk_cap": 204800.0, "bandwidth_mbps": 2000.0, "proc_rate_mbps": 400.0, "power_static_w": 15.0, "power_max_w": 350.0},
+    {"node_id": "vm_4",  "cpu_cap": 8.0,  "mem_cap": 16384.0, "disk_cap": 204800.0, "bandwidth_mbps": 2000.0, "proc_rate_mbps": 400.0, "power_static_w": 15.0, "power_max_w": 350.0},
+    {"node_id": "vm_5",  "cpu_cap": 8.0,  "mem_cap": 16384.0, "disk_cap": 204800.0, "bandwidth_mbps": 2000.0, "proc_rate_mbps": 400.0, "power_static_w": 15.0, "power_max_w": 350.0},
+    {"node_id": "vm_6",  "cpu_cap": 16.0, "mem_cap": 32768.0, "disk_cap": 512000.0, "bandwidth_mbps": 5000.0, "proc_rate_mbps": 800.0, "power_static_w": 20.0, "power_max_w": 500.0},
+    {"node_id": "vm_7",  "cpu_cap": 16.0, "mem_cap": 32768.0, "disk_cap": 512000.0, "bandwidth_mbps": 5000.0, "proc_rate_mbps": 800.0, "power_static_w": 20.0, "power_max_w": 500.0},
+    {"node_id": "vm_8",  "cpu_cap": 4.0,  "mem_cap": 32768.0, "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 12.0, "power_max_w": 250.0},
+    {"node_id": "vm_9",  "cpu_cap": 4.0,  "mem_cap": 32768.0, "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 12.0, "power_max_w": 250.0},
+    {"node_id": "vm_10", "cpu_cap": 2.0,  "mem_cap": 4096.0,  "disk_cap": 51200.0,  "bandwidth_mbps": 500.0,  "proc_rate_mbps": 100.0, "power_static_w": 8.0,  "power_max_w": 120.0},
+    {"node_id": "vm_11", "cpu_cap": 2.0,  "mem_cap": 4096.0,  "disk_cap": 51200.0,  "bandwidth_mbps": 500.0,  "proc_rate_mbps": 100.0, "power_static_w": 8.0,  "power_max_w": 120.0},
+    {"node_id": "vm_12", "cpu_cap": 32.0, "mem_cap": 65536.0, "disk_cap": 1024000.0,"bandwidth_mbps": 10000.0,"proc_rate_mbps": 1600.0,"power_static_w": 30.0, "power_max_w": 800.0},
+    {"node_id": "vm_13", "cpu_cap": 32.0, "mem_cap": 65536.0, "disk_cap": 1024000.0,"bandwidth_mbps": 10000.0,"proc_rate_mbps": 1600.0,"power_static_w": 30.0, "power_max_w": 800.0},
+    {"node_id": "vm_14", "cpu_cap": 4.0,  "mem_cap": 8192.0,  "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 11.0, "power_max_w": 200.0},
+    {"node_id": "vm_15", "cpu_cap": 4.0,  "mem_cap": 8192.0,  "disk_cap": 102400.0, "bandwidth_mbps": 1000.0, "proc_rate_mbps": 200.0, "power_static_w": 11.0, "power_max_w": 200.0}
+  ]
+}

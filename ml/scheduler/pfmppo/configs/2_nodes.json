@@ -1,0 +1,25 @@
+{
+  "description": "Small dev cluster: 2 lightweight VMs",
+  "vms": [
+    {
+      "node_id": "vm_0",
+      "cpu_cap": 2.0,
+      "mem_cap": 4096.0,
+      "disk_cap": 51200.0,
+      "bandwidth_mbps": 500.0,
+      "proc_rate_mbps": 100.0,
+      "power_static_w": 8.0,
+      "power_max_w": 120.0
+    },
+    {
+      "node_id": "vm_1",
+      "cpu_cap": 2.0,
+      "mem_cap": 4096.0,
+      "disk_cap": 51200.0,
+      "bandwidth_mbps": 500.0,
+      "proc_rate_mbps": 100.0,
+      "power_static_w": 8.0,
+      "power_max_w": 120.0
+    }
+  ]
+}
