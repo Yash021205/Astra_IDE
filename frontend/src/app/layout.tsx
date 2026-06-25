@@ -2,12 +2,13 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Toaster from '../components/Toaster';
 import CommandPalette from '../components/CommandPalette';
+import { THEME_BOOT_SCRIPT } from '../lib/theme';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://astra-ide.local'),
   title: {
-    default:  'ASTRA-IDE — Cloud IDE that schedules itself',
-    template: '%s — ASTRA-IDE',
+    default:  'ASTRA-IDE | Cloud IDE that schedules itself',
+    template: '%s | ASTRA-IDE',
   },
   description:
     'Adaptive Scheduling & Telemetry-driven Resource-aware Cloud IDE. ' +
@@ -48,7 +49,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor:   '#1d4ed8',
+  themeColor:   '#2B5748',
   width:        'device-width',
   initialScale: 1,
 };
@@ -56,7 +57,20 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-astra-600/40">
+      <head>
+        {/* Apply the saved theme before first paint (prevents light/dark flash). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* Typography system (MongoDB-style: geometric sans + serif display +
+            Source Code Pro for code). Loaded at runtime to keep Docker builds
+            offline-safe. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-bg text-ink min-h-screen font-sans antialiased selection:bg-astra-600/30">
         {children}
         <Toaster />
         <CommandPalette />

@@ -1,268 +1,273 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
-import {
-  Brain, Cpu, Eye, Shield, Network, Leaf, Users, Github,
-} from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Github } from 'lucide-react';
 
-import AuroraBackground   from '../components/ui/AuroraBackground';
-import Spotlight          from '../components/ui/Spotlight';
-import Sparkles           from '../components/ui/Sparkles';
-import ThreeDCard         from '../components/ui/ThreeDCard';
+import Navbar              from '../components/Navbar';
+import AuroraBackground    from '../components/ui/AuroraBackground';
+import ThreeDCard          from '../components/ui/ThreeDCard';
 import HoverBorderGradient from '../components/ui/HoverBorderGradient';
-import CanvasText         from '../components/ui/CanvasText';
-import TextHoverEffect    from '../components/ui/TextHoverEffect';
+import CanvasText          from '../components/ui/CanvasText';
+import TextHoverEffect     from '../components/ui/TextHoverEffect';
+import TeamPhoto           from '../components/ui/TeamPhoto';
 import AnimatedTerminal, { type TerminalLine } from '../components/ui/AnimatedTerminal';
-import InteractiveGlobe, { type GlobeMarker, type GlobeArc } from '../components/ui/InteractiveGlobe';
-import { BentoGrid, BentoCard } from '../components/ui/BentoGrid';
+import LayoutGrid, { type GridCard } from '../components/ui/LayoutGrid';
+import NoiseBackground     from '../components/ui/NoiseBackground';
+import BigFooter           from '../components/ui/BigFooter';
+import CountUp             from '../components/ui/CountUp';
+import GoToTop             from '../components/ui/GoToTop';
+import { useTheme }        from '../lib/theme';
+import { Brain, Cpu, Eye, Shield, Network, Leaf, Users } from 'lucide-react';
+
+const GithubGlobe = dynamic(() => import('../components/ui/GithubGlobe'), { ssr: false });
 
 const DEMO_TERMINAL: TerminalLine[] = [
-  { kind: 'comment', text: '# user requests a workspace' },
-  { kind: 'cmd', prompt: '$', text: 'POST /api/v1/workspaces  language=bash network=true' },
+  { kind: 'cmd', prompt: 'user@iiitm:~$', text: 'POST /api/v1/workspaces  language=bash network=true' },
   { kind: 'out', text: '-> risk scorer evaluating...' },
   { kind: 'ok',  text: 'x language=bash         +0.30' },
   { kind: 'ok',  text: 'x network_access=true   +0.20' },
   { kind: 'ok',  text: 'x filesystem_write=true +0.20' },
   { kind: 'warn', text: '! suspicious "subprocess" in code  +0.10' },
   { kind: 'out', text: '-> final risk = 0.80 -> sandbox = firecracker' },
-  { kind: 'cmd', prompt: '$', text: 'kubectl apply -f workspace.yaml  runtimeClassName=firecracker' },
+  { kind: 'cmd', prompt: 'user@iiitm:~$', text: 'kubectl apply -f workspace.yaml' },
+  { kind: 'out', text: 'runtimeClassName=firecracker' },
   { kind: 'ok',  text: 'x pod ws-7-a2c3 scheduled on node-eu-2 (lowest carbon)' },
-  { kind: 'comment', text: '# eBPF telemetry feeds PPO scheduler state in real-time' },
-  { kind: 'cmd', prompt: '$', text: 'tetragon trace --pod ws-7-a2c3' },
+  { kind: 'cmd', prompt: 'user@iiitm:~$', text: 'tetragon trace --pod ws-7-a2c3' },
   { kind: 'out', text: 'sched_switch  cpu=2  run_q=3   net=124KiB/s' },
 ];
 
-// Simulated live users + clusters around the world
-const GLOBE_MARKERS: GlobeMarker[] = [
-  { id: 'cluster-a', label: 'cluster-a (DK)',   lat: 55.5,  lng: 9.5,    kind: 'cluster' },
-  { id: 'cluster-b', label: 'cluster-b (IN)',   lat: 28.6,  lng: 77.2,   kind: 'cluster' },
-  { id: 'cluster-c', label: 'cluster-c (US)',   lat: 37.7,  lng: -122.4, kind: 'cluster' },
-  { id: 'u-mum',  label: 'Mumbai',        lat: 19.07, lng: 72.87, kind: 'user' },
-  { id: 'u-bng',  label: 'Bangalore',     lat: 12.97, lng: 77.59, kind: 'user' },
-  { id: 'u-blr',  label: 'Berlin',        lat: 52.52, lng: 13.40, kind: 'user' },
-  { id: 'u-lon',  label: 'London',        lat: 51.51, lng:  -0.13, kind: 'user' },
-  { id: 'u-nyc',  label: 'New York',      lat: 40.71, lng: -74.01, kind: 'user' },
-  { id: 'u-tky',  label: 'Tokyo',         lat: 35.68, lng: 139.69, kind: 'user' },
-  { id: 'u-syd',  label: 'Sydney',        lat: -33.87, lng: 151.21, kind: 'user' },
-  { id: 'u-spo',  label: 'Sao Paulo',     lat: -23.55, lng: -46.63, kind: 'user' },
-  { id: 'w-1', label: 'ws-py-runc',    lat: 56.0,  lng: 10.0,  kind: 'workspace' },
-  { id: 'w-2', label: 'ws-cpp-gvisor', lat: 28.0,  lng: 78.0,  kind: 'workspace' },
-  { id: 'w-3', label: 'ws-sh-fc',      lat: 37.0,  lng: -121.0, kind: 'workspace' },
+const FEATURE_CARDS: GridCard[] = [
+  {
+    id: 'ppo', accent: 'astra', span: 'md:col-span-2', icon: <Brain size={28} />,
+    title: 'DRL-PPO Scheduler',
+    blurb: 'A reinforcement-learning agent decides which machine runs your workspace.',
+    what: 'Instead of the default Kubernetes scheduler, ASTRA uses a Proximal Policy Optimization (PPO) agent. It reads a 40-number snapshot of the whole cluster (CPU, memory, queue length, carbon, latency) and learns from experience where to place each workspace so the cluster stays fast and full without overloading any node.',
+    how: [
+      'Create a workspace — placement is automatic, you do nothing.',
+      'Open the Platform page to watch the agent\'s live decisions and reward.',
+      'Heavy load? The agent spreads new pods to idle nodes on its own.',
+    ],
+  },
+  {
+    id: 'ebpf', accent: 'cyan', icon: <Eye size={28} />,
+    title: 'eBPF Telemetry',
+    blurb: 'Kernel-level signals collected with under 1% overhead.',
+    what: 'Tiny safe programs run inside the Linux kernel (via Tetragon) and report what every workspace actually does — syscalls, CPU scheduling, network bytes — in well under a second. This is the live data the scheduler and the security scorer both feed on.',
+    how: [
+      'Run any code in a workspace; telemetry starts automatically.',
+      'See per-workspace CPU / run-queue / network in the Clusters view.',
+      'Suspicious syscalls raise the risk score in real time.',
+    ],
+  },
+  {
+    id: 'sandbox', accent: 'rose', icon: <Shield size={28} />,
+    title: 'Adaptive Sandboxing',
+    blurb: 'Risky code is automatically locked into a stronger jail.',
+    what: 'Every workspace gets a risk score from its language, permissions, and code patterns. Low risk runs in fast runc containers; medium risk in gVisor (a user-space kernel); high risk in a Firecracker microVM with its own kernel — so dangerous code can\'t escape.',
+    how: [
+      'Pick "Auto" when creating a workspace to let the scorer choose.',
+      'See the chosen tier (runc / gVisor / Firecracker) in the header.',
+      'Owners can pin a stricter tier from the tier menu any time.',
+    ],
+  },
+  {
+    id: 'lstm', accent: 'emerald', icon: <Cpu size={28} />,
+    title: 'LSTM Prewarming',
+    blurb: 'Predicts when you\'ll log in and warms a workspace beforehand.',
+    what: 'A small LSTM model learns each user\'s usage rhythm and predicts sessions about 15 minutes ahead. Matching workspaces are pre-started into a warm pool, so when you actually open one the cold-start wait is gone.',
+    how: [
+      'Just use ASTRA normally for a few days so it learns your pattern.',
+      'Return at your usual time — your workspace opens near-instantly.',
+      'Warm-pool hits show up on the Benchmarks page.',
+    ],
+  },
+  {
+    id: 'multi', accent: 'amber', icon: <Network size={28} />,
+    title: 'Multi-Cluster',
+    blurb: 'Three regions act as one pool the scheduler sees globally.',
+    what: 'Karmada federates cluster-a (Denmark), cluster-b (India) and cluster-c (US). Workspaces are routed to the nearest healthy region, and if a cluster fails its workloads are rescheduled to a survivor in seconds.',
+    how: [
+      'You connect to the closest region automatically — lowest latency.',
+      'Watch live region health on the Clusters page.',
+      'If a region goes down, your workspaces fail over on their own.',
+    ],
+  },
+  {
+    id: 'carbon', accent: 'purple', icon: <Leaf size={28} />,
+    title: 'Carbon-Aware',
+    blurb: 'Batch jobs wait for cleaner, lower-carbon electricity.',
+    what: 'ASTRA reads each region\'s real-time grid carbon intensity (electricityMaps). Interactive workspaces run immediately, but deferrable batch jobs are scheduled into greener time windows or greener regions to cut emissions.',
+    how: [
+      'Mark a job as batch/deferrable when you submit it.',
+      'ASTRA delays it to a low-carbon window automatically.',
+      'See carbon saved per run on the Platform page.',
+    ],
+  },
+  {
+    id: 'crdt', accent: 'cyan', span: 'md:col-span-2', icon: <Users size={28} />,
+    title: 'Yjs CRDT Collaboration',
+    blurb: 'Edit the same file together in real time — like Google Docs for code.',
+    what: 'Monaco is wired to a Yjs CRDT so multiple people can type in the same file at once with no merge conflicts. Awareness shows every collaborator\'s cursor and selection, and sync latency stays under 20ms over WebSocket.',
+    how: [
+      'Open a workspace and click Share to invite teammates by username.',
+      'Open the Editor tab — you\'ll see their live cursors and names.',
+      'Use the presence bar to see who is viewing which file right now.',
+    ],
+  },
 ];
 
-const GLOBE_ARCS: GlobeArc[] = [
-  { fromId: 'u-mum',  toId: 'cluster-b', flow: 0.8 },
-  { fromId: 'u-bng',  toId: 'cluster-b', flow: 0.7 },
-  { fromId: 'u-blr',  toId: 'cluster-a', flow: 0.6 },
-  { fromId: 'u-lon',  toId: 'cluster-a', flow: 0.5 },
-  { fromId: 'u-nyc',  toId: 'cluster-c', flow: 0.9 },
-  { fromId: 'u-tky',  toId: 'cluster-b', flow: 0.4 },
-  { fromId: 'u-syd',  toId: 'cluster-c', flow: 0.5 },
-  { fromId: 'u-spo',  toId: 'cluster-c', flow: 0.6 },
-  { fromId: 'cluster-a', toId: 'cluster-b', flow: 0.3, color: 'rgba(168,85,247,0.5)' },
-  { fromId: 'cluster-b', toId: 'cluster-c', flow: 0.3, color: 'rgba(168,85,247,0.5)' },
-];
-
-// Team — sorted by roll number ascending
 const TEAM = [
-  { name: 'Prasanna Mishra',   roll: '2023IMT-059' },
-  { name: 'Udit Srivastava',   roll: '2023IMT-084' },
-  { name: 'Yash Wani',         roll: '2023IMT-087' },
+  { name: 'Prasanna Mishra',   roll: '2023IMT-059', img: '/team/prasanna.png' },
+  { name: 'Udit Srivastava',   roll: '2023IMT-084', img: '/team/udit.png' },
+  { name: 'Yash Wani',         roll: '2023IMT-087', img: '/team/yash.png' },
 ];
 
 export default function HomePage() {
+  const [theme] = useTheme();
+  // Dot-matrix headline colours: dark greens on the light pastel hero,
+  // light sage/pastels on the dark hero.
+  const grad1: [string, string, string] = theme === 'dark' ? ['#9CB080', '#cddafd', '#fde2e4'] : ['#273338', '#2B5748', '#618764'];
+  const grad2: [string, string, string] = theme === 'dark' ? ['#cddafd', '#9CB080', '#fad2e1'] : ['#2B5748', '#618764', '#9CB080'];
+
   return (
-    <main className="min-h-screen">
-      {/* ─────────── HERO ─────────── */}
+    <main className="min-h-screen overflow-x-hidden">
+      {/* HERO */}
       <AuroraBackground className="relative min-h-screen overflow-hidden">
-        <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="rgba(168,85,247,0.7)" />
-        <Sparkles density={0.4} color="#a5b4fc" />
+        <Navbar variant="hero" />
 
-        {/* Navbar */}
-        <nav className="relative z-20 max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="ASTRA-IDE" width={36} height={36} className="rounded" />
-            <span className="text-xl font-bold tracking-tight">
-              ASTRA-<span className="text-astra-500">IDE</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="px-3 py-1.5 text-sm rounded hover:bg-slate-800/70 text-slate-200">
-              Log in
-            </Link>
-            <Link href="/register">
-              <HoverBorderGradient containerClassName="text-sm">Sign up</HoverBorderGradient>
-            </Link>
-          </div>
-        </nav>
-
-        {/* Hero content */}
-        <section className="relative z-10 max-w-7xl mx-auto px-6 pt-8 pb-24 grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
+        <section className="relative z-10 max-w-7xl mx-auto px-6 pt-28 pb-16 grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
           <div className="lg:col-span-3 space-y-7">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-astra-400 mb-3">
+              <p className="text-sm uppercase tracking-[0.3em] text-astra-700 dark:text-astra-300 mb-3">
                 Cloud IDE
               </p>
-              <CanvasText
-                text="The cloud IDE"
-                height={130}
-                fontSize={104}
-                gradient={['#60a5fa', '#a855f7', '#ec4899']}
-              />
-              <CanvasText
-                text="that schedules itself."
-                height={130}
-                fontSize={92}
-                gradient={['#a855f7', '#ec4899', '#f97316']}
-              />
+              <CanvasText text="The cloud IDE" height={130} fontSize={104} gradient={grad1} />
+              <CanvasText text="that schedules itself." height={130} fontSize={92} gradient={grad2} />
             </div>
 
-            <p className="text-slate-300 text-lg leading-relaxed max-w-2xl">
-              <span className="text-astra-400 font-semibold">DRL-PPO</span> scheduling,{' '}
-              <span className="text-purple-400 font-semibold">eBPF</span> telemetry,{' '}
-              <span className="text-pink-400 font-semibold">adaptive sandboxing</span>,{' '}
-              <span className="text-amber-400 font-semibold">LSTM prewarming</span>, multi-cluster
-              federation, and conflict-free collaboration — one open research platform.
+            <p className="text-muted text-lg leading-relaxed max-w-2xl">
+              <span className="text-astra-700 dark:text-astra-300 font-semibold">DRL-PPO</span> scheduling,{' '}
+              <span className="text-blossom-600 dark:text-blossom-300 font-semibold">eBPF</span> telemetry,{' '}
+              <span className="text-astra-600 dark:text-astra-200 font-semibold">adaptive sandboxing</span>,{' '}
+              <span className="text-blossom-500 dark:text-blossom-200 font-semibold">LSTM prewarming</span>, multi-cluster
+              federation, and conflict-free collaboration, in one open research platform.
             </p>
 
             <div className="flex flex-wrap gap-3">
               <Link href="/register">
                 <HoverBorderGradient containerClassName="text-base">
-                  Get started — it&apos;s free →
+                  Get started for free
                 </HoverBorderGradient>
               </Link>
               <a
                 href="https://github.com/PrasannaMishra001/astra-ide"
-                className="px-5 py-2.5 rounded-full border border-slate-700 hover:border-slate-500 bg-slate-900/60 text-sm font-medium inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-full border border-edge-strong hover:bg-raised bg-surface/60 backdrop-blur text-ink text-sm font-medium inline-flex items-center gap-2 transition-colors"
               >
                 <Github size={16} /> View on GitHub
               </a>
             </div>
 
             <div className="pt-6 grid grid-cols-3 gap-6 max-w-xl text-sm">
-              <Stat value="< 2s"   label="Cold start (predicted)" />
-              <Stat value="78%+"   label="Resource utilization" />
-              <Stat value="< 20ms" label="Collab latency" />
+              <Stat prefix="< " value={2}  suffix="s"  label="Cold start (predicted)" />
+              <Stat value={78} suffix="%+" label="Resource utilization" />
+              <Stat prefix="< " value={20} suffix="ms" label="Collab latency" />
             </div>
           </div>
 
-          {/* Logo card with improved 3D tilt */}
           <div className="lg:col-span-2 flex justify-center">
-            <ThreeDCard intensity={18} className="w-full max-w-sm">
-              <div className="rounded-2xl bg-slate-900/70 backdrop-blur p-8 border border-slate-800 shadow-2xl">
-                <div className="relative w-full aspect-square">
-                  <Image src="/logo.png" alt="ASTRA-IDE Logo" fill className="object-contain" priority />
-                </div>
-                <div className="text-center mt-4">
-                  <div className="text-xs text-slate-400 font-mono">v0.1 · 2026</div>
-                </div>
-              </div>
-            </ThreeDCard>
+            <AnimatedTerminal lines={DEMO_TERMINAL} title="astra-ide@cloud"
+                              speedMul={2} bodyHeight={400} className="w-full max-w-xl" />
           </div>
         </section>
       </AuroraBackground>
 
-      {/* ─────────── INTERACTIVE GLOBE ─────────── */}
-      <section className="bg-slate-950 py-24 border-t border-slate-900">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-10 text-center">
-            <p className="text-xs uppercase tracking-widest text-astra-400 mb-3">Live globe</p>
-            <h2 className="text-3xl md:text-4xl font-bold">Workspaces around the world</h2>
-            <p className="text-slate-400 mt-4 max-w-2xl mx-auto">
-              Every user connects to the nearest cluster. The PPO scheduler watches global state and
-              routes workspaces across <span className="text-astra-400">cluster-a (Denmark)</span>,{' '}
-              <span className="text-purple-400">cluster-b (India)</span>, and{' '}
-              <span className="text-pink-400">cluster-c (US)</span>.
-              Drag the globe to rotate it.
-            </p>
+      {/* GLOBE - text left, globe right (partially clipped) */}
+      <section className="relative bg-bg py-14 border-t border-edge overflow-hidden">
+        <SectionBlobs a="#6366f1" b="#38bdf8" c="#22d3ee" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="space-y-6">
+              <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400">Live globe</p>
+              <h2 className="t-liquid text-3xl md:text-5xl leading-tight">
+                Workspaces around the world
+              </h2>
+              <p className="text-muted leading-relaxed max-w-lg">
+                Every user connects to the nearest cluster. The PPO scheduler watches global state and
+                routes workspaces across four federated regions:{' '}
+                <span className="text-astra-600 dark:text-astra-300 font-medium">Denmark</span>,{' '}
+                <span className="text-blossom-500 dark:text-blossom-300 font-medium">India</span>,{' '}
+                <span className="text-astra-500 dark:text-astra-400 font-medium">California</span> and{' '}
+                <span className="text-blossom-400 dark:text-blossom-200 font-medium">Singapore</span>.
+                Drag the globe to rotate it.
+              </p>
+              <div className="grid grid-cols-3 gap-4 pt-2">
+                <MiniStat label="Clusters" value="4" />
+                <MiniStat label="Regions" value="EU / IN / US / SG" />
+                <MiniStat label="Failover" value="< 10s" />
+              </div>
+            </div>
+            <div className="relative lg:-mr-24 xl:-mr-32">
+              <GithubGlobe />
+              <div className="flex items-center justify-center gap-5 mt-2 text-[11px] text-faint">
+                <Legend color="#e08e9b" label="User cities" />
+                <Legend color="#9CB080" label="Clusters" />
+              </div>
+            </div>
           </div>
-          <InteractiveGlobe markers={GLOBE_MARKERS} arcs={GLOBE_ARCS} height={520} />
         </div>
       </section>
 
-      {/* ─────────── DEMO TERMINAL ─────────── */}
-      <section className="bg-slate-950 py-24 border-t border-slate-900">
-        <div className="max-w-5xl mx-auto px-6">
+      {/* DEMO TERMINAL */}
+      <section className="relative bg-bg py-14 border-t border-edge overflow-hidden">
+        <SectionBlobs a="#2dd4bf" b="#f472b6" c="#818cf8" />
+        <div className="relative max-w-5xl mx-auto px-6">
           <div className="mb-10 text-center">
-            <p className="text-xs uppercase tracking-widest text-astra-400 mb-3">Live demo</p>
-            <h2 className="text-3xl md:text-4xl font-bold">Adaptive sandboxing — in real time</h2>
-            <p className="text-slate-400 mt-4 max-w-2xl mx-auto">
+            <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">Live demo</p>
+            <h2 className="t-liquid text-3xl md:text-5xl">Adaptive sandboxing, in real time</h2>
+            <p className="text-muted mt-4 max-w-2xl mx-auto">
               When a user submits code, the risk scorer routes it to the right isolation tier:
-              <span className="text-emerald-400"> runc </span>(low overhead),
-              <span className="text-amber-400"> gVisor </span>(user-space kernel), or
-              <span className="text-rose-400"> Firecracker </span>(hardware microVM).
+              <span className="text-emerald-600 dark:text-emerald-400"> runc </span>(low overhead),
+              <span className="text-amber-600 dark:text-amber-400"> gVisor </span>(user-space kernel), or
+              <span className="text-rose-600 dark:text-rose-400"> Firecracker </span>(hardware microVM).
             </p>
           </div>
           <AnimatedTerminal lines={DEMO_TERMINAL} title="astra-ide@scheduler" />
         </div>
       </section>
 
-      {/* ─────────── BENTO GRID ─────────── */}
-      <section className="bg-slate-950 py-24 border-t border-slate-900">
-        <div className="max-w-7xl mx-auto px-6">
+      {/* FEATURE LAYOUT GRID (click a card to expand + learn) */}
+      <section className="relative bg-bg py-14 border-t border-edge overflow-hidden">
+        <SectionBlobs a="#818cf8" b="#38bdf8" c="#f472b6" />
+        <div className="relative max-w-7xl mx-auto px-6">
           <div className="mb-12 text-center">
-            <p className="text-xs uppercase tracking-widest text-astra-400 mb-3">Seven breakthroughs</p>
-            <h2 className="text-3xl md:text-4xl font-bold">Built for research, designed for production</h2>
+            <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">Seven breakthroughs</p>
+            <h2 className="t-liquid text-3xl md:text-5xl">Built for research, designed for production</h2>
+            <p className="text-muted mt-4 max-w-xl mx-auto">
+              Click any card to see what it does in plain language and how to use it.
+            </p>
           </div>
 
-          <BentoGrid>
-            <BentoCard accent="astra" span="col-2"
-              icon={<Brain size={28} />}
-              title="DRL-PPO Scheduler"
-              description="40-dim state vector. Multi-discrete action space. Proximal Policy Optimization replaces Kubernetes' default scheduler — learns optimal pod placement from live telemetry."
-            />
-            <BentoCard accent="cyan"
-              icon={<Eye size={28} />}
-              title="eBPF Telemetry"
-              description="Sub-second kernel-level signals via Tetragon + sched_ext. < 1% overhead."
-            />
-            <BentoCard accent="rose"
-              icon={<Shield size={28} />}
-              title="Adaptive Sandboxing"
-              description="runc -> gVisor -> Firecracker, auto-selected by real-time risk scoring."
-            />
-            <BentoCard accent="emerald"
-              icon={<Cpu size={28} />}
-              title="LSTM Prewarming"
-              description="Predicts user sessions 15 min ahead. Cold start eliminated for warm-pool hits."
-            />
-            <BentoCard accent="amber"
-              icon={<Network size={28} />}
-              title="Multi-Cluster"
-              description="Karmada federation routes load across regions. PPO sees the global state."
-            />
-            <BentoCard accent="purple"
-              icon={<Leaf size={28} />}
-              title="Carbon-Aware"
-              description="Real-time electricityMaps signal. Batch workloads defer to low-carbon windows."
-            />
-            <BentoCard accent="cyan" span="col-2"
-              icon={<Users size={28} />}
-              title="Yjs CRDT Collaboration"
-              description="Real-time conflict-free editing inside Monaco. Awareness shows every cursor. < 20ms sync latency over WebSocket."
-            />
-          </BentoGrid>
+          <LayoutGrid cards={FEATURE_CARDS} />
         </div>
       </section>
 
-      {/* ─────────── TEXT HOVER + TEAM ─────────── */}
-      <section className="bg-slate-950 py-24 border-t border-slate-900">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* TEXT HOVER + TEAM */}
+      <section className="relative bg-bg py-14 border-t border-edge overflow-hidden">
+        <SectionBlobs a="#f472b6" b="#818cf8" c="#38bdf8" />
+        <div className="relative max-w-6xl mx-auto px-6">
           <div className="h-52 md:h-72">
             <TextHoverEffect text="ASTRA-IDE" />
           </div>
 
           <div className="mt-8">
-            <p className="text-xs uppercase tracking-widest text-astra-400 mb-6 text-center">Team</p>
+            <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-6 text-center">Team</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               {TEAM.map((m) => (
                 <ThreeDCard key={m.roll} intensity={10}>
-                  <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur text-center">
-                    <div className="mx-auto w-14 h-14 rounded-full bg-gradient-to-br from-astra-500 to-purple-600 flex items-center justify-center text-xl font-bold mb-3">
-                      {m.name.split(' ').map((w) => w[0]).join('').slice(0, 2)}
-                    </div>
-                    <div className="font-semibold">{m.name}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 font-mono">{m.roll}</div>
+                  <div className="p-5 card text-center">
+                    <TeamPhoto src={m.img} alt={m.name} size={96} />
+                    <div className="font-semibold mt-3">{m.name}</div>
+                    <div className="text-xs text-faint mt-0.5 font-mono">{m.roll}</div>
                   </div>
                 </ThreeDCard>
               ))}
@@ -271,37 +276,73 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─────────── CTA ─────────── */}
-      <section className="bg-slate-950 py-24 border-t border-slate-900">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to try the future of cloud IDEs?
-          </h2>
-          <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-            Spin up a workspace in seconds. Get a private Monaco editor with collaborative editing,
-            real-time risk-tier assignment, and one-click code execution.
-          </p>
-          <Link href="/register">
-            <HoverBorderGradient containerClassName="text-base">
-              Create your free account →
-            </HoverBorderGradient>
-          </Link>
+      {/* CTA with animated noise background */}
+      <section className="border-t border-edge bg-bg py-14">
+        <div className="max-w-5xl mx-auto px-6">
+          <NoiseBackground className="px-8 py-16 sm:px-16 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+              Ready to try the future of cloud IDEs?
+            </h2>
+            <p className="text-white/80 mb-8 max-w-xl mx-auto">
+              Spin up a workspace in seconds. Get a private Monaco editor with collaborative editing,
+              real-time risk-tier assignment, and one-click code execution.
+            </p>
+            <Link href="/register"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-slate-900
+                             font-semibold text-base shadow-lg hover:scale-[1.03] transition-transform">
+              Create your free account
+            </Link>
+          </NoiseBackground>
         </div>
       </section>
 
-      <footer className="border-t border-slate-900 px-6 py-6 text-xs text-slate-500 text-center">
-        ASTRA-IDE · 2026 · <a href="https://github.com/PrasannaMishra001/astra-ide"
-                              className="text-slate-400 hover:text-slate-200">GitHub</a>
-      </footer>
+      <BigFooter />
+      <GoToTop />
     </main>
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+// Soft blurred colour blobs behind a section (subtle in dark, richer in light)
+// so content sections don't look bland. Place as first child of a `relative
+// overflow-hidden` section.
+function SectionBlobs({ a = '#818cf8', b = '#f472b6', c = '#38bdf8' }: { a?: string; b?: string; c?: string }) {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -left-16 -top-16 w-[40rem] h-[40rem] rounded-full blur-[60px] opacity-100 dark:opacity-40"
+           style={{ background: `radial-gradient(circle, ${a}, transparent 60%)` }} />
+      <div className="absolute -right-20 -bottom-16 w-[44rem] h-[44rem] rounded-full blur-[60px] opacity-100 dark:opacity-35"
+           style={{ background: `radial-gradient(circle, ${b}, transparent 60%)` }} />
+      <div className="absolute left-1/3 top-1/4 w-[28rem] h-[28rem] rounded-full blur-[60px] opacity-90 dark:opacity-25"
+           style={{ background: `radial-gradient(circle, ${c}, transparent 62%)` }} />
+    </div>
+  );
+}
+
+function Stat({ value, label, prefix = '', suffix = '' }:
+  { value: number; label: string; prefix?: string; suffix?: string }) {
   return (
     <div>
-      <div className="text-2xl font-bold text-astra-400">{value}</div>
-      <div className="text-xs text-slate-400 mt-1">{label}</div>
+      <CountUp value={value} prefix={prefix} suffix={suffix}
+               className="text-2xl font-bold text-astra-700 dark:text-astra-300" />
+      <div className="text-xs text-faint mt-1">{label}</div>
+    </div>
+  );
+}
+
+function MiniStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-lg font-bold text-ink">{value}</div>
+      <div className="text-[11px] text-faint">{label}</div>
     </div>
   );
 }

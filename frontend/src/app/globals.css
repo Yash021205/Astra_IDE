@@ -2,86 +2,307 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { height: 100%; background: #020617; }
+/* ── Theme tokens ─────────────────────────────────────────────────────────
+   Light is the default; `.dark` on <html> flips the palette. Values are RGB
+   triplets so Tailwind alpha modifiers work (bg-surface/60 etc).            */
+/* ── Palettes ───────────────────────────────────────────────────────────────
+   LIGHT — soft pastels (linen / lavender / mint / blush / periwinkle) with
+   near-black text. DARK — sage→deep-slate greens (#9CB080 #618764 #2B5748
+   #273338) with light text. Green is the shared brand accent (see tailwind
+   `astra`). Surfaces are glassy (see .card / .glass).                        */
+:root {
+  --c-bg:          243 241 245;   /* lavender-mist / parchment blend */
+  --c-surface:     255 255 255;   /* white (cards use translucent glass) */
+  --c-raised:      234 228 233;   /* eae4e9 lavender mist */
+  --c-edge:        226 222 232;   /* soft lavender border */
+  --c-edge-strong: 205 218 253;   /* cddafd periwinkle */
+  --c-ink:         20  20  24;    /* near-black text */
+  --c-muted:       74  78  88;    /* dark slate-grey */
+  --c-faint:       130 133 145;   /* mid grey */
+  --scroll-track:  234 228 233;
+  --scroll-thumb:  205 218 253;
+  /* accent pastels for decoration */
+  --p-blush:       253 226 228;
+  --p-mint:        226 236 233;
+  --p-blue:        190 225 230;
+  --p-lavender:    223 231 253;
+}
+.dark {
+  --c-bg:          33  44  48;    /* slightly cooler dark slate */
+  --c-surface:     40  54  58;
+  --c-raised:      50  68  65;
+  --c-edge:        60  78  75;
+  --c-edge-strong: 110 145 112;   /* visible green border */
+  --c-ink:         240 245 238;   /* bright cream-white text */
+  --c-muted:       186 206 170;   /* LIGHTER sage for readable labels */
+  --c-faint:       148 168 142;   /* clearly visible secondary text */
+  --scroll-track:  40  54  58;
+  --scroll-thumb:  110 145 112;
+}
 
-.monaco-host { height: 100%; width:  100%; }
+:root {
+  --font-sans:  'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-mono:  'Source Code Pro', 'JetBrains Mono', ui-monospace, monospace;
+}
 
-/* ── Aurora background ──────────────────────────────────────────────────── */
-.aurora-layer {
-  position: absolute;
-  inset: -10%;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.6;
-  pointer-events: none;
+html, body {
+  height: 100%;
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-ink));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Typography scale (MongoDB foundations: serif display, geometric sans body,
+   Source Code Pro for code). Use these classes instead of ad-hoc text sizes. */
+@layer components {
+  .t-display { font-family: var(--font-serif); font-weight: 600; font-size: 3rem;    line-height: 1.1;  letter-spacing: -0.02em; }   /* H1 48 */
+  .t-h1      { font-family: var(--font-serif); font-weight: 600; font-size: 2rem;    line-height: 1.15; letter-spacing: -0.01em; }   /* H2 32 */
+  .t-h2      { font-family: var(--font-sans);  font-weight: 600; font-size: 1.5rem;  line-height: 1.25; letter-spacing: -0.01em; }   /* H3 24 */
+  .t-h3      { font-family: var(--font-sans);  font-weight: 600; font-size: 1.125rem;line-height: 1.4; }                              /* Subtitle 18 */
+  .t-subtitle{ font-family: var(--font-sans);  font-weight: 500; font-size: 1rem;    line-height: 1.5; }                              /* Body lg 16 */
+  .t-body    { font-family: var(--font-sans);  font-weight: 400; font-size: 0.875rem;line-height: 1.55; }                            /* Body 14 */
+  .t-body-sm { font-family: var(--font-sans);  font-weight: 400; font-size: 0.8125rem;line-height: 1.5; }                            /* Body sm 13 */
+  .t-overline{ font-family: var(--font-sans);  font-weight: 600; font-size: 0.6875rem;line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; }
+  .t-code    { font-family: var(--font-mono);  font-weight: 400; font-size: 0.8125rem;line-height: 1.5; }
+}
+
+/* ── Accessibility (HCI) ────────────────────────────────────────────────── */
+/* Visible keyboard focus everywhere, without rings on mouse clicks. */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Skip-to-content link (revealed on keyboard focus). */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  padding: 8px 14px; border-radius: 0 0 8px 0;
+  background: #2563eb; color: white; font-size: 13px;
+}
+.skip-link:focus { left: 0; }
+
+/* ── Shared component classes ───────────────────────────────────────────── */
+@layer components {
+  /* Glassmorphic card: translucent surface + blur + subtle highlight border. */
+  .card {
+    @apply rounded-xl shadow-card;
+    background: rgb(var(--c-surface) / 0.72);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgb(var(--c-edge) / 0.7);
+  }
+  .dark .card { background: rgb(var(--c-surface) / 0.55); }
+  /* Frosted panel for sidebars / sticky chrome. */
+  .glass {
+    background: rgb(var(--c-surface) / 0.6);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border-color: rgb(var(--c-edge) / 0.6);
+  }
+  .dark .glass { background: rgb(var(--c-surface) / 0.45); }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-astra-700 px-4 py-2
+           text-sm font-medium text-white transition-colors hover:bg-astra-800
+           dark:bg-astra-500 dark:hover:bg-astra-400 dark:text-astra-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-edge-strong
+           px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-raised
+           disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm
+           text-muted transition-colors hover:bg-raised hover:text-ink;
+  }
+  .input-base {
+    @apply w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-ink
+           placeholder:text-faint outline-none transition-colors
+           focus:border-astra-500 focus:ring-2 focus:ring-astra-500/25;
+  }
+  .nav-pill {
+    @apply rounded-lg px-3 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-ink;
+  }
+  .nav-pill-active {
+    @apply rounded-lg px-3 py-1.5 text-sm font-medium text-astra-600 bg-astra-500/10
+           dark:text-astra-300;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md border border-edge bg-raised px-1.5 py-0.5
+           text-[11px] text-muted;
+  }
+}
+
+/* ── Ambient background blobs (subtle, GPU-cheap, both themes) ──────────── */
+.ambient {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+}
+.ambient::before, .ambient::after {
+  content: ''; position: absolute; border-radius: 9999px; filter: blur(90px);
   will-change: transform;
 }
-.aurora-1 {
-  background: radial-gradient(circle at 30% 30%, #3b82f6, transparent 60%);
-  animation: aurora-drift-1 18s ease-in-out infinite alternate;
+.ambient::before {
+  width: 560px; height: 560px; left: -120px; top: -160px;
+  background: radial-gradient(circle, rgb(176 196 177 / 0.22), transparent 65%);
+  animation: blob-a 26s ease-in-out infinite alternate;
 }
-.aurora-2 {
-  background: radial-gradient(circle at 70% 60%, #a855f7, transparent 60%);
-  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+.ambient::after {
+  width: 640px; height: 640px; right: -180px; bottom: -220px;
+  background: radial-gradient(circle, rgb(237 175 184 / 0.16), transparent 65%);
+  animation: blob-b 32s ease-in-out infinite alternate;
 }
-.aurora-3 {
-  background: radial-gradient(circle at 50% 80%, #ec4899, transparent 55%);
-  animation: aurora-drift-3 26s ease-in-out infinite alternate;
-  opacity: 0.4;
+.dark .ambient::before { background: radial-gradient(circle, rgb(176 196 177 / 0.10), transparent 65%); }
+.dark .ambient::after  { background: radial-gradient(circle, rgb(237 175 184 / 0.08), transparent 65%); }
+@keyframes blob-a { to { transform: translate(70px, 50px) scale(1.12); } }
+@keyframes blob-b { to { transform: translate(-60px, -50px) scale(0.94); } }
+
+.monaco-host { height: 100%; width: 100%; }
+
+/* ── Aurora background (landing page, dark hero) ────────────────────────── */
+.aurora-layer {
+  position: absolute; inset: -10%; border-radius: 50%;
+  filter: blur(80px); opacity: 0.6; pointer-events: none; will-change: transform;
+}
+.aurora-1 { background: radial-gradient(circle at 30% 30%, #2B5748, transparent 60%); animation: aurora-drift-1 18s ease-in-out infinite alternate; }
+.aurora-2 { background: radial-gradient(circle at 70% 60%, #618764, transparent 60%); animation: aurora-drift-2 22s ease-in-out infinite alternate; }
+.aurora-3 { background: radial-gradient(circle at 50% 80%, #9CB080, transparent 55%); animation: aurora-drift-3 26s ease-in-out infinite alternate; opacity: 0.3; }
+
+/* Light hero: soft pastel base + gentle blurred colour blobs that drift slowly
+   (calm, not pointer-reactive). Gives the light theme depth so it isn't washed
+   out. */
+.aurora-light {
+  background:
+    radial-gradient(ellipse 50% 46% at 18% 22%, #a5b4fc 0%, transparent 56%),
+    radial-gradient(ellipse 46% 42% at 86% 14%, #f9a8d4 0%, transparent 56%),
+    radial-gradient(ellipse 54% 50% at 74% 84%, #7dd3fc 0%, transparent 58%),
+    radial-gradient(ellipse 50% 46% at 20% 90%, #67e8f9 0%, transparent 56%),
+    linear-gradient(180deg, #f5f3ff 0%, #eef2ff 100%);
+}
+.aurora-light::before, .aurora-light::after {
+  content: ''; position: absolute; border-radius: 9999px; filter: blur(60px);
+  opacity: 0.85; will-change: transform; pointer-events: none;
+}
+.aurora-light::before {
+  width: 44vw; height: 44vw; left: 6%; top: 4%;
+  background: radial-gradient(circle, #818cf8, transparent 68%);
+  animation: blob-a 28s ease-in-out infinite alternate;
+}
+.aurora-light::after {
+  width: 48vw; height: 48vw; right: 2%; bottom: -10%;
+  background: radial-gradient(circle, #f472b6, transparent 68%);
+  animation: blob-b 34s ease-in-out infinite alternate;
 }
 .aurora-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.05; mix-blend-mode: overlay;
   background-image:
     radial-gradient(circle at 25% 25%, rgba(255,255,255,0.15) 1px, transparent 1px),
     radial-gradient(circle at 75% 75%, rgba(255,255,255,0.10) 1px, transparent 1px);
   background-size: 50px 50px;
 }
+@keyframes aurora-drift-1 { 0% { transform: translate(0,0) scale(1.0);} 100% { transform: translate(8%,-6%) scale(1.15);} }
+@keyframes aurora-drift-2 { 0% { transform: translate(0,0) scale(1.1);} 100% { transform: translate(-10%,8%) scale(0.95);} }
+@keyframes aurora-drift-3 { 0% { transform: translate(0,0) scale(0.9);} 100% { transform: translate(6%,-12%) scale(1.2);} }
 
-@keyframes aurora-drift-1 {
-  0%   { transform: translate(0,    0)    scale(1.0); }
-  100% { transform: translate(8%, -6%)    scale(1.15); }
+/* ── Conic gradient spin (HoverBorderGradient) ──────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── View Transition for theme toggle: the clip-path circle (set in JS) is the
+   only animation; disable the default cross-fade so the new theme "spreads"
+   cleanly from the button. The new theme paints on top. ─────────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
-@keyframes aurora-drift-2 {
-  0%   { transform: translate(0,    0)    scale(1.1); }
-  100% { transform: translate(-10%, 8%)   scale(0.95); }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 9999; }
+
+/* ── Background ripple (login/signup grid) ──────────────────────────────── */
+@keyframes ripple-flash {
+  0%   { background-color: rgb(99 102 241 / 0); }
+  35%  { background-color: rgb(99 102 241 / 0.35); box-shadow: 0 0 18px rgb(99 102 241 / 0.45); }
+  100% { background-color: rgb(99 102 241 / 0); box-shadow: 0 0 0 transparent; }
 }
-@keyframes aurora-drift-3 {
-  0%   { transform: translate(0,    0)    scale(0.9); }
-  100% { transform: translate(6%, -12%)   scale(1.2); }
+.ripple-cell { animation: none; }
+.grid > .ripple-cell[style*="animation-delay"] { animation: ripple-flash 0.9s ease-out forwards; }
+
+/* ── Film-grain noise (NoiseBackground CTA) ─────────────────────────────── */
+.noise-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  /* static grain — the animated translate caused edge flicker */
 }
 
-/* ── Conic gradient spin (used in HoverBorderGradient) ──────────────────── */
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* ── Liquid-glass headings (Apple-style frosted, specular sweep) ─────────── */
+.t-liquid {
+  position: relative;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: transparent;
+  background-image: linear-gradient(
+    105deg,
+    #2563eb 0%, #7c3aed 22%, #db2777 40%,
+    #ffffff 50%,
+    #db2777 60%, #7c3aed 78%, #2563eb 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: liquid-sheen 6s linear infinite;
+  filter: drop-shadow(0 2px 12px rgb(124 58 237 / 0.18));
+}
+/* Bright blue → indigo → pink sheen (both themes), eye-catching not muddy. */
+.t-liquid {
+  background-image: linear-gradient(
+    105deg,
+    #2563eb 0%, #6366f1 22%, #db2777 42%,
+    #4f46e5 50%,
+    #db2777 58%, #6366f1 78%, #2563eb 100%
+  );
+}
+.dark .t-liquid {
+  background-image: linear-gradient(
+    105deg,
+    #60a5fa 0%, #a5b4fc 22%, #f472b6 42%,
+    #c7d2fe 50%,
+    #f472b6 58%, #a5b4fc 78%, #60a5fa 100%
+  );
+}
+@keyframes liquid-sheen {
+  0%   { background-position: 0% 0; }
+  100% { background-position: 250% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-liquid { animation: none; }
 }
 
-/* ── Yjs cursor names ───────────────────────────────────────────────────── */
-.yRemoteSelection {
-  background-color: rgba(80, 80, 80, 0.25);
-}
+/* ── Yjs remote cursors ─────────────────────────────────────────────────── */
+.yRemoteSelection { background-color: rgba(80, 80, 80, 0.25); }
 .yRemoteSelectionHead {
-  position: absolute;
-  border-left: 2px solid;
-  border-top: 2px solid;
-  border-bottom: 2px solid;
-  height: 100%;
-  box-sizing: border-box;
+  position: absolute; border-left: 2px solid; border-top: 2px solid; border-bottom: 2px solid;
+  height: 100%; box-sizing: border-box;
 }
 .yRemoteSelectionHead::after {
-  position: absolute;
-  content: ' ';
-  border: 3px solid currentColor;
-  border-radius: 4px;
-  left: -4px;
-  top: -5px;
+  position: absolute; content: ' '; border: 3px solid currentColor; border-radius: 4px;
+  left: -4px; top: -5px;
 }
 
-/* ── Scrollbar styling ──────────────────────────────────────────────────── */
+/* ── Scrollbars (theme-aware) ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0f172a; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-track { background: rgb(var(--scroll-track)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--scroll-thumb)); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-faint)); }
