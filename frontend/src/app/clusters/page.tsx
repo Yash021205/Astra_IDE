@@ -1,30 +1,41 @@
 'use client';
-// Cluster topology page — interactive magnetic visualization of the
-// multi-cluster Kubernetes federation that ASTRA-IDE schedules across.
+// Clusters: a live operations console for the multi-cluster federation that
+// ASTRA-IDE schedules across. Per-cluster cards show region + grid carbon;
+// each node row shows live CPU / memory / network with utilization bars
+// (polled every 4s from /metrics/nodes, the same telemetry the PPO scheduler
+// consumes). The activity feed streams scheduler / eBPF / sandbox events.
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { Cpu, Network, Zap, Activity, Leaf } from 'lucide-react';
-
-import ClusterCanvas, { type ClusterNode, type ClusterEdge } from '../../components/ui/ClusterCanvas';
-import ThreeDCard from '../../components/ui/ThreeDCard';
-import ActivityFeed from '../../components/ActivityFeed';
 import {
-  listWorkspaces, getNodeMetrics, type Workspace, type MetricsSnapshot,
+  Boxes, Cpu, Globe2, Layers, Leaf, MemoryStick, Network, Server, Wifi,
+} from 'lucide-react';
+
+import AppShell from '../../components/AppShell';
+import ActivityFeed from '../../components/ActivityFeed';
+import FederationTopology from '../../components/FederationTopology';
+import {
+  listWorkspaces, getNodeMetrics,
+  type Workspace, type MetricsSnapshot, type NodeMetrics, type ClusterMetrics,
 } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { cn } from '../../lib/utils';
 
 const METRICS_POLL_MS = 4000;
 
+// Region metadata for the demo federation (4 Karmada members).
+const CLUSTER_META: Record<string, { region: string; flagLabel: string }> = {
+  'cluster-a': { region: 'Denmark (west)',  flagLabel: 'low-carbon grid' },
+  'cluster-b': { region: 'India (north)',   flagLabel: 'fossil-heavy grid' },
+  'cluster-c': { region: 'California (US)',  flagLabel: 'mixed grid' },
+  'cluster-d': { region: 'Singapore',       flagLabel: 'mixed grid' },
+};
+
 export default function ClustersPage() {
   const router = useRouter();
-  const { token, user, hydrated, clearSession } = useAuth();
+  const { token, hydrated } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [metrics, setMetrics]       = useState<MetricsSnapshot | null>(null);
+  const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -32,335 +43,174 @@ export default function ClustersPage() {
     listWorkspaces().then(setWorkspaces).catch(() => {});
 
     let cancelled = false;
-    async function pollMetrics() {
+    async function poll() {
       try {
         const snap = await getNodeMetrics();
         if (!cancelled) setMetrics(snap);
-      } catch { /* ignore — backend may still be coming up */ }
+      } catch { /* backend may still be starting */ }
     }
-    pollMetrics();
-    const id = setInterval(pollMetrics, METRICS_POLL_MS);
+    poll();
+    const id = setInterval(poll, METRICS_POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, [token, hydrated]);
 
-  // Derive carbon from the live metrics snapshot (more accurate than hitting
-  // the carbon API ourselves — the backend already refreshes it on a schedule)
-  const carbonA = metrics?.clusters.find((c) => c.cluster_id === 'cluster-a')?.carbon_gco2 ?? null;
-  const carbonB = metrics?.clusters.find((c) => c.cluster_id === 'cluster-b')?.carbon_gco2 ?? null;
-
-  // Build the topology from the user's workspaces — each workspace
-  // becomes a pod attached to one of the two clusters.
-  const { nodes, edges } = buildTopology(workspaces);
-
-  // Stats
-  const sandboxCounts = workspaces.reduce((acc, w) => {
-    acc[w.sandbox_tier] = (acc[w.sandbox_tier] || 0) + 1;
-    return acc;
+  const running = workspaces.filter((w) => w.status === 'RUNNING').length;
+  const tiers = workspaces.reduce((acc, w) => {
+    acc[w.sandbox_tier] = (acc[w.sandbox_tier] || 0) + 1; return acc;
   }, {} as Record<string, number>);
-  const runningCount = workspaces.filter((w) => w.status === 'RUNNING').length;
 
   return (
-    <main className="min-h-screen relative">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08),_transparent_50%)]" />
-
-      <header className="relative border-b border-slate-800 px-6 py-3 flex items-center justify-between bg-slate-950/60 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="ASTRA-IDE" width={28} height={28} className="rounded" />
-            <span className="text-base font-bold tracking-tight">ASTRA<span className="text-astra-500">-IDE</span></span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-1 text-sm ml-2">
-            <Link href="/dashboard"  className="px-3 py-1.5 rounded text-slate-300 hover:bg-slate-800/40">Workspaces</Link>
-            <Link href="/clusters"   className="px-3 py-1.5 rounded text-astra-300 bg-slate-800/60">Clusters</Link>
-            <Link href="/benchmarks" className="px-3 py-1.5 rounded text-slate-300 hover:bg-slate-800/40">Benchmarks</Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-slate-400">@{user?.username}</span>
-          <button onClick={() => { clearSession(); router.push('/'); }} type="button"
-                  className="px-3 py-1.5 rounded border border-slate-700 hover:bg-slate-900">
-            Log out
-          </button>
-        </div>
-      </header>
-
-      <section className="relative max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <div>
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold"
-          >
-            Cluster topology
-          </motion.h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Hover over a node to inspect it. Nodes are magnetic — they're attracted to your cursor.
-          </p>
-        </div>
-
-        <ClusterCanvas nodes={nodes} edges={edges} height={500} />
-
-        {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            icon={<Cpu      size={20} className="text-astra-400"  />}
-            label="Workspaces" value={workspaces.length}
-            sub={`${runningCount} running`}
-          />
-          <StatCard
-            icon={<Network  size={20} className="text-purple-400" />}
-            label="Clusters" value={2}
-            sub="cluster-a · cluster-b"
-          />
-          <StatCard
-            icon={<Activity size={20} className="text-emerald-400" />}
-            label="Sandbox mix"
-            value={`${sandboxCounts.runc ?? 0}/${sandboxCounts.gvisor ?? 0}/${sandboxCounts.firecracker ?? 0}`}
-            sub="runc / gvisor / fc"
-          />
-          <StatCard
-            icon={<Leaf     size={20} className="text-lime-400"    />}
-            label="Carbon (gCO₂/kWh)"
-            value={carbonA !== null ? carbonA.toFixed(0) : '—'}
-            sub={`cluster-b: ${carbonB !== null ? carbonB.toFixed(0) : '—'}`}
-          />
-        </div>
-
-        {/* Live node metrics — CPU, memory, network — polled every 4s */}
-        {metrics && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {metrics.clusters.flatMap((c) =>
-              c.nodes.map((n) => (
-                <NodeMetricCard key={`${c.cluster_id}/${n.node_name}`} node={n} />
-              )),
-            )}
+    <AppShell>
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8 space-y-6">
+        <div className="flex items-end justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="t-h1">Clusters</h1>
+            <p className="text-sm text-muted mt-1">
+              Live federation telemetry, the exact input the PPO scheduler learns from (refreshed every {METRICS_POLL_MS / 1000}s).
+            </p>
           </div>
-        )}
-
-        {/* Per-cluster cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ClusterDetailCard
-            name="cluster-a"
-            location="DK-DK1 (Denmark West)"
-            carbon={carbonA}
-            podCount={workspaces.filter((w) => w.cluster_id === 'local' || w.cluster_id === 'cluster-a').length}
-            accent="from-emerald-500/20"
-          />
-          <ClusterDetailCard
-            name="cluster-b"
-            location="IN-NO (India North)"
-            carbon={carbonB}
-            podCount={workspaces.filter((w) => w.cluster_id === 'cluster-b').length}
-            accent="from-purple-500/20"
-          />
+          <span className="chip py-1" title="Workloads are propagated across member clusters with Karmada">
+            <Layers size={12} /> Karmada federation
+          </span>
         </div>
 
-        {/* Live scheduler / sandbox / eBPF activity feed */}
-        <ActivityFeed className="mt-2" />
+        {/* Top stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Stat icon={<Boxes size={16} className="text-astra-600 dark:text-astra-400" />}
+                label="Workspaces" value={workspaces.length} sub={`${running} running`} />
+          <Stat icon={<Globe2 size={16} className="text-purple-600 dark:text-purple-400" />}
+                label="Clusters" value={metrics?.clusters.length ?? 4} sub="federated regions" />
+          <Stat icon={<Server size={16} className="text-emerald-600 dark:text-emerald-400" />}
+                label="Nodes" value={metrics ? metrics.clusters.reduce((s, c) => s + c.nodes.length, 0) : '...'}
+                sub="reporting telemetry" />
+          <Stat icon={<Cpu size={16} className="text-amber-600 dark:text-amber-400" />}
+                label="Sandbox mix"
+                value={`${tiers.runc ?? 0} / ${tiers.gvisor ?? 0} / ${tiers.firecracker ?? 0}`}
+                sub="runc / gVisor / Firecracker" />
+        </div>
 
-        <p className="text-xs text-slate-500 italic text-center pt-4">
-          Topology renders the workspaces visible to your account. eBPF telemetry &amp; PPO decisions
-          will animate edges in real-time once the Phase 3 collector is wired up.
-        </p>
+        {/* Federation topology */}
+        {metrics && <FederationTopology clusters={metrics.clusters} />}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Cluster cards */}
+          <div className="lg:col-span-2 space-y-5">
+            {!metrics && <ClusterSkeleton />}
+            {metrics?.clusters.map((c) => (
+              <ClusterCard key={c.cluster_id} cluster={c}
+                           podsHere={workspaces.filter((w) => w.cluster_id === c.cluster_id).length} />
+            ))}
+            <p className="text-xs text-faint leading-relaxed px-1">
+              Greener regions are preferred by the carbon-aware policy: deferrable workloads shift
+              toward the cluster with the lower grid intensity. If a cluster fails, Karmada
+              reschedules its workloads onto the survivors (verified live with a 2-cluster kill test).
+            </p>
+          </div>
+
+          {/* Activity feed */}
+          <ActivityFeed className="lg:col-span-1" />
+        </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
-function StatCard({ icon, label, value, sub }:
+function ClusterCard({ cluster, podsHere }: { cluster: ClusterMetrics; podsHere: number }) {
+  const meta = CLUSTER_META[cluster.cluster_id] ?? { region: cluster.location, flagLabel: '' };
+  const carbon = cluster.carbon_gco2;
+  const carbonTone =
+    carbon < 150 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+    : carbon < 400 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
+    : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30';
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-edge flex items-center gap-3 flex-wrap">
+        <span className="w-8 h-8 rounded-lg bg-astra-500/10 border border-astra-500/30
+                         flex items-center justify-center" aria-hidden="true">
+          <Server size={15} className="text-astra-600 dark:text-astra-400" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-sm">{cluster.cluster_id}</h2>
+          <p className="text-xs text-faint">{meta.region}</p>
+        </div>
+        <span className={cn('text-[11px] px-2 py-1 rounded-md border font-medium inline-flex items-center gap-1.5', carbonTone)}
+              title={`Live grid carbon intensity (${meta.flagLabel})`}>
+          <Leaf size={11} /> {carbon.toFixed(0)} gCO2/kWh
+        </span>
+        <span className="chip py-1" title="Workspaces currently placed on this cluster">
+          {podsHere} workspaces, {cluster.total_pods} pods
+        </span>
+      </div>
+
+      <ul className="divide-y divide-edge">
+        {cluster.nodes.map((n) => <NodeRow key={n.node_name} node={n} />)}
+      </ul>
+    </div>
+  );
+}
+
+function NodeRow({ node }: { node: NodeMetrics }) {
+  return (
+    <li className="px-4 py-3 grid grid-cols-1 sm:grid-cols-[10rem_1fr_1fr_1fr_5rem] gap-x-5 gap-y-2 items-center">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={cn('w-2 h-2 rounded-full shrink-0',
+          node.cpu_util > 0.85 ? 'bg-rose-500' : 'bg-emerald-500')} aria-hidden="true" />
+        <span className="text-sm font-mono truncate">{node.node_name}</span>
+      </div>
+      <Meter icon={<Cpu size={11} />} label="CPU" pct={node.cpu_util} />
+      <Meter icon={<MemoryStick size={11} />} label="Memory" pct={node.memory_util} />
+      <Meter icon={<Wifi size={11} />} label="Net" pct={Math.min(node.network_kbps / 1000, 1)}
+             display={`${node.network_kbps.toFixed(0)} KiB/s`} />
+      <span className="text-[11px] text-faint font-mono justify-self-start sm:justify-self-end"
+            title="Active pods / run-queue length">
+        {node.active_pods} pods
+      </span>
+    </li>
+  );
+}
+
+function Meter({ icon, label, pct, display }:
+  { icon: React.ReactNode; label: string; pct: number; display?: string }) {
+  const p = Math.max(0, Math.min(1, pct));
+  const tone = p > 0.85 ? 'bg-rose-500' : p > 0.6 ? 'bg-amber-500' : 'bg-astra-500';
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px] text-faint mb-1">
+        <span className="inline-flex items-center gap-1">{icon} {label}</span>
+        <span className="font-mono">{display ?? `${(p * 100).toFixed(0)}%`}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-raised overflow-hidden"
+           role="meter" aria-label={label} aria-valuenow={Math.round(p * 100)}
+           aria-valuemin={0} aria-valuemax={100}>
+        <div className={cn('h-full rounded-full transition-[width] duration-700 ease-out', tone)}
+             style={{ width: `${p * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Stat({ icon, label, value, sub }:
   { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
-    <ThreeDCard intensity={5}>
-      <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/50 backdrop-blur hover:border-astra-600/40 transition-colors">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs uppercase tracking-wider text-slate-500">{label}</span>
-          {icon}
-        </div>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-        {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+    <div className="card p-4">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] uppercase tracking-wider text-faint">{label}</span>
+        {icon}
       </div>
-    </ThreeDCard>
-  );
-}
-
-function NodeMetricCard({ node }: { node: NodeMetricsT }) {
-  return (
-    <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/40 backdrop-blur">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-mono text-slate-300">{node.node_name}</span>
-        <span className="text-[10px] text-slate-500">{node.cluster_id}</span>
-      </div>
-      <Bar label="CPU"      value={node.cpu_util}    color="bg-astra-500" />
-      <Bar label="Memory"   value={node.memory_util} color="bg-purple-500" />
-      <div className="flex justify-between text-[10px] text-slate-400 mt-2 font-mono">
-        <span>runq {node.run_queue_len.toFixed(1)}</span>
-        <span>net {node.network_kbps.toFixed(0)}KiB/s</span>
-        <span>pods {node.active_pods}</span>
-      </div>
+      <div className="text-2xl font-bold tabular-nums">{value}</div>
+      {sub && <div className="text-xs text-faint mt-0.5">{sub}</div>}
     </div>
   );
 }
 
-function Bar({ label, value, color }: { label: string; value: number; color: string }) {
+function ClusterSkeleton() {
   return (
-    <div className="mb-1.5">
-      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
-        <span>{label}</span>
-        <span className="font-mono">{(value * 100).toFixed(0)}%</span>
-      </div>
-      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-        <div className={cn('h-full transition-all duration-500', color)}
-             style={{ width: `${Math.min(100, value * 100)}%` }} />
-      </div>
+    <div className="card p-4 animate-pulse" aria-hidden="true">
+      <div className="h-4 w-40 rounded bg-raised mb-4" />
+      {[0, 1].map((i) => (
+        <div key={i} className="h-3 w-full rounded bg-raised mb-3" />
+      ))}
     </div>
   );
-}
-
-// Type alias to satisfy TS — same shape as api.NodeMetrics
-type NodeMetricsT = {
-  cluster_id:    string;
-  node_name:     string;
-  cpu_util:      number;
-  memory_util:   number;
-  network_kbps:  number;
-  run_queue_len: number;
-  active_pods:   number;
-};
-
-function ClusterDetailCard({
-  name, location, carbon, podCount, accent,
-}: {
-  name:     string;
-  location: string;
-  carbon:   number | null;
-  podCount: number;
-  accent:   string;
-}) {
-  const carbonClass = (v: number | null) => {
-    if (v === null) return 'text-slate-400';
-    if (v < 100)    return 'text-emerald-400';
-    if (v < 300)    return 'text-amber-400';
-    return 'text-rose-400';
-  };
-
-  return (
-    <div className={cn(
-      'p-5 rounded-xl border border-slate-800 bg-gradient-to-br to-transparent backdrop-blur',
-      accent,
-    )}>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h2 className="text-xl font-bold">{name}</h2>
-          <p className="text-xs text-slate-400 mt-0.5">{location}</p>
-        </div>
-        <Zap className="text-astra-400" size={20} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <div className="text-xs text-slate-500">Active pods</div>
-          <div className="text-2xl font-bold tabular-nums">{podCount}</div>
-        </div>
-        <div>
-          <div className="text-xs text-slate-500">Carbon intensity</div>
-          <div className={cn('text-2xl font-bold tabular-nums', carbonClass(carbon))}>
-            {carbon !== null ? carbon.toFixed(0) : '—'}
-            <span className="text-xs ml-1 text-slate-500">gCO₂/kWh</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Topology builder ─────────────────────────────────────────────────────────
-
-function buildTopology(workspaces: Workspace[]): { nodes: ClusterNode[]; edges: ClusterEdge[] } {
-  const nodes: ClusterNode[] = [];
-  const edges: ClusterEdge[] = [];
-
-  // Karmada control plane in the middle
-  nodes.push({
-    id: 'karmada', label: 'karmada', cluster: 'global',
-    type: 'control', x: 0.5, y: 0.5,
-  });
-
-  // Cluster A on the left
-  nodes.push({
-    id: 'ctrl-a', label: 'cluster-a-control', cluster: 'cluster-a',
-    type: 'control', x: 0.18, y: 0.5,
-  });
-  nodes.push({
-    id: 'worker-a1', label: 'worker-a-1', cluster: 'cluster-a',
-    type: 'worker', x: 0.10, y: 0.30,
-  });
-  nodes.push({
-    id: 'worker-a2', label: 'worker-a-2', cluster: 'cluster-a',
-    type: 'worker', x: 0.10, y: 0.70,
-  });
-
-  // Cluster B on the right
-  nodes.push({
-    id: 'ctrl-b', label: 'cluster-b-control', cluster: 'cluster-b',
-    type: 'control', x: 0.82, y: 0.5,
-  });
-  nodes.push({
-    id: 'worker-b1', label: 'worker-b-1', cluster: 'cluster-b',
-    type: 'worker', x: 0.90, y: 0.30,
-  });
-  nodes.push({
-    id: 'worker-b2', label: 'worker-b-2', cluster: 'cluster-b',
-    type: 'worker', x: 0.90, y: 0.70,
-  });
-
-  // Inter-cluster edges
-  edges.push({ from: 'karmada', to: 'ctrl-a', flow: 0.9, kind: 'control' });
-  edges.push({ from: 'karmada', to: 'ctrl-b', flow: 0.9, kind: 'control' });
-  edges.push({ from: 'ctrl-a', to: 'worker-a1', flow: 0.6, kind: 'control' });
-  edges.push({ from: 'ctrl-a', to: 'worker-a2', flow: 0.6, kind: 'control' });
-  edges.push({ from: 'ctrl-b', to: 'worker-b1', flow: 0.6, kind: 'control' });
-  edges.push({ from: 'ctrl-b', to: 'worker-b2', flow: 0.6, kind: 'control' });
-
-  // Pods — distribute workspaces across the 4 workers
-  const workers = ['worker-a1', 'worker-a2', 'worker-b1', 'worker-b2'];
-  const podPositions: Record<string, { x: number; y: number }> = {
-    'worker-a1': { x: 0.04, y: 0.16 },
-    'worker-a2': { x: 0.04, y: 0.84 },
-    'worker-b1': { x: 0.96, y: 0.16 },
-    'worker-b2': { x: 0.96, y: 0.84 },
-  };
-
-  workspaces.slice(0, 12).forEach((w, idx) => {
-    const wn = workers[idx % workers.length];
-    const base = podPositions[wn];
-    const offset = (idx % 3) * 0.04 - 0.04;
-    nodes.push({
-      id: `pod-${w.id}`, label: w.name, cluster: w.cluster_id,
-      type: 'pod', sandbox: w.sandbox_tier,
-      x: base.x + (Math.random() - 0.5) * 0.04,
-      y: base.y + offset,
-    });
-    edges.push({
-      from: wn, to: `pod-${w.id}`, flow: 0.3, kind: 'telemetry',
-    });
-  });
-
-  // If user has no workspaces yet, show 3 demo pods so the page isn't empty
-  if (workspaces.length === 0) {
-    const demo = [
-      { id: 'demo-1', label: 'demo-runc',        sandbox: 'runc'        as const, x: 0.06, y: 0.20 },
-      { id: 'demo-2', label: 'demo-gvisor',      sandbox: 'gvisor'      as const, x: 0.95, y: 0.20 },
-      { id: 'demo-3', label: 'demo-firecracker', sandbox: 'firecracker' as const, x: 0.95, y: 0.80 },
-    ];
-    demo.forEach((d) => {
-      nodes.push({
-        id: d.id, label: d.label, cluster: 'demo',
-        type: 'pod', sandbox: d.sandbox, x: d.x, y: d.y,
-      });
-    });
-    edges.push({ from: 'worker-a1', to: 'demo-1', flow: 0.5, kind: 'telemetry' });
-    edges.push({ from: 'worker-b1', to: 'demo-2', flow: 0.5, kind: 'telemetry' });
-    edges.push({ from: 'worker-b2', to: 'demo-3', flow: 0.5, kind: 'telemetry' });
-  }
-
-  return { nodes, edges };
 }
