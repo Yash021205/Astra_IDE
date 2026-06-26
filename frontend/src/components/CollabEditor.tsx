@@ -14,15 +14,30 @@ import type { editor } from 'monaco-editor';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { MonacoBinding } from 'y-monaco';
-import { Play, Download, Share2, Loader2 } from 'lucide-react';
+import { Play, Download, Share2, Loader2, Settings2, Check, Palette } from 'lucide-react';
+import type { Monaco } from '@monaco-editor/react';
 
 import { executeCode, type ExecuteResponse } from '../lib/api';
+import { collabWsUrl } from '../lib/ws';
 import { cn } from '../lib/utils';
 import { toast } from '../lib/toast';
 import BottomPanel from './BottomPanel';
 import ShareModal from './ShareModal';
 import EditorStatusBar from './EditorStatusBar';
 import KeybindingsHelp from './KeybindingsHelp';
+import ThemePicker from './ThemePicker';
+import {
+  applyEditorTheme, getSavedTheme, saveTheme, themeById, resolveMonacoName,
+} from '../lib/editorThemes';
+
+// Editor preferences, persisted across sessions.
+interface EditorPrefs { fontSize: number; minimap: boolean; wordWrap: boolean; }
+const PREFS_KEY = 'astra-editor-prefs';
+function loadPrefs(): EditorPrefs {
+  if (typeof window === 'undefined') return { fontSize: 14, minimap: true, wordWrap: true };
+  try { return { fontSize: 14, minimap: true, wordWrap: true, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
+  catch { return { fontSize: 14, minimap: true, wordWrap: true }; }
+}
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -89,6 +104,28 @@ export default function CollabEditor({
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<ExecuteResponse | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [prefs, setPrefs] = useState<EditorPrefs>(loadPrefs);
+  // Editor color theme (VS Code themes via monaco-themes), independent of the
+  // app light/dark chrome. Kept in sync with the <Editor theme> prop.
+  const [themeId, setThemeId] = useState<string>(getSavedTheme);
+  const [monacoTheme, setMonacoTheme] = useState<string>(
+    () => resolveMonacoName(getSavedTheme()));
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const monacoRef = useRef<Monaco | null>(null);
+
+  async function pickTheme(id: string) {
+    setThemeId(id); saveTheme(id);
+    if (monacoRef.current) setMonacoTheme(await applyEditorTheme(monacoRef.current, id));
+    setShowThemePicker(false);
+    toast.success('Theme applied', themeById(id).label);
+  }
+
+  function updatePref<K extends keyof EditorPrefs>(k: K, v: EditorPrefs[K]) {
+    const next = { ...prefs, [k]: v };
+    setPrefs(next);
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
 
   const ydocRef     = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
@@ -98,7 +135,7 @@ export default function CollabEditor({
   // ── Yjs sync ────────────────────────────────────────────────────────────
   useEffect(() => {
     const ydoc     = new Y.Doc();
-    const wsUrl    = process.env.NEXT_PUBLIC_COLLAB_WS_URL || 'ws://localhost:1234';
+    const wsUrl    = collabWsUrl();
     const provider = new WebsocketProvider(wsUrl, room, ydoc);
     const myColor  = pickColor(username);
 
@@ -127,8 +164,11 @@ export default function CollabEditor({
     };
   }, [room, username]);
 
-  const onMount = (instance: editor.IStandaloneCodeEditor) => {
+  const onMount = (instance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     editorRef.current = instance;
+    monacoRef.current = monaco;
+    // Register + apply the saved VS Code theme, then sync the prop.
+    applyEditorTheme(monaco, themeId).then(setMonacoTheme).catch(() => {});
     const ydoc     = ydocRef.current!;
     const provider = providerRef.current!;
     const ytext    = ydoc.getText('monaco');
@@ -272,7 +312,65 @@ export default function CollabEditor({
           </button>
         )}
 
-        <span className="text-slate-500 ml-2">room: <span className="font-mono">{room}</span></span>
+        {/* Editor settings */}
+        <div className="relative">
+          <button type="button" onClick={() => setShowSettings((v) => !v)}
+                  aria-haspopup="true" aria-expanded={showSettings}
+                  title="Editor settings"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white">
+            <Settings2 size={13} />
+          </button>
+          {showSettings && (
+            <>
+              <div aria-hidden="true" className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
+              <div
+                   className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-slate-200">
+                <div className="px-1 py-1 text-[11px] uppercase tracking-wider text-slate-500">Editor settings</div>
+                <div className="flex items-center justify-between px-1 py-1.5">
+                  <span className="text-xs">Font size</span>
+                  <div className="inline-flex items-center gap-1">
+                    {[12, 13, 14, 16, 18].map((s) => (
+                      <button key={s} type="button" onClick={() => updatePref('fontSize', s)}
+                              className={cn('w-6 h-6 rounded text-[11px]',
+                                prefs.fontSize === s ? 'bg-astra-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700')}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button type="button" onClick={() => updatePref('minimap', !prefs.minimap)}
+                        className="w-full flex items-center justify-between px-1 py-1.5 text-xs hover:bg-slate-800 rounded">
+                  <span>Minimap</span>
+                  <span className={cn('w-4 h-4 rounded border flex items-center justify-center',
+                    prefs.minimap ? 'bg-astra-600 border-astra-600' : 'border-slate-600')}>
+                    {prefs.minimap && <Check size={11} className="text-white" />}
+                  </span>
+                </button>
+                <button type="button" onClick={() => updatePref('wordWrap', !prefs.wordWrap)}
+                        className="w-full flex items-center justify-between px-1 py-1.5 text-xs hover:bg-slate-800 rounded">
+                  <span>Word wrap</span>
+                  <span className={cn('w-4 h-4 rounded border flex items-center justify-center',
+                    prefs.wordWrap ? 'bg-astra-600 border-astra-600' : 'border-slate-600')}>
+                    {prefs.wordWrap && <Check size={11} className="text-white" />}
+                  </span>
+                </button>
+                <div className="px-1 pt-1 text-[10px] text-slate-500">Use the Theme button for editor colors.</div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Theme picker (VS Code themes) */}
+        <button
+          type="button"
+          onClick={() => setShowThemePicker(true)}
+          title="Editor theme (VS Code themes)"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+        >
+          <Palette size={13} /> <span className="hidden lg:inline">{themeById(themeId).label}</span>
+        </button>
+
+        <span className="text-slate-500 ml-2 hidden md:inline">room: <span className="font-mono">{room}</span></span>
 
         {/* Presence list */}
         <div className="ml-auto flex items-center gap-1.5">
@@ -282,8 +380,8 @@ export default function CollabEditor({
           {peers.slice(0, 6).map((p) => (
             <span
               key={p.name}
-              className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-              style={{ backgroundColor: p.color, color: 'white' }}
+              className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
+              style={{ backgroundColor: p.color }}
             >
               {p.name}
             </span>
@@ -295,21 +393,22 @@ export default function CollabEditor({
       <div className={cn('flex-1 min-h-0', output ? 'h-2/3' : '')}>
         <MonacoEditor
           height="100%"
-          theme="vs-dark"
+          theme={monacoTheme}
           language={currentLang}
           onMount={onMount}
           options={{
-            fontSize: 14,
-            minimap: { enabled: true, scale: 0.7 },
+            automaticLayout: true,
+            fontSize: prefs.fontSize,
+            minimap: { enabled: prefs.minimap, scale: 0.7 },
             scrollBeyondLastLine: false,
-            wordWrap: 'on',
+            wordWrap: prefs.wordWrap ? 'on' : 'off',
             tabSize: 4,
             insertSpaces: true,
             cursorBlinking: 'smooth',
             cursorSmoothCaretAnimation: 'on',
             smoothScrolling: true,
             bracketPairColorization: { enabled: true },
-            guides: { bracketPairs: true, indentation: true },
+            guides: { bracketPairs: true, indentation: true, highlightActiveIndentation: true },
             renderLineHighlight: 'all',
             fontLigatures: true,
             fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace',
@@ -318,7 +417,7 @@ export default function CollabEditor({
             formatOnType: true,
             suggestOnTriggerCharacters: true,
             quickSuggestions: true,
-            // VS Code keybindings are the Monaco default — Ctrl+S, Ctrl+/, Ctrl+D,
+            // VS Code keybindings are the Monaco default: Ctrl+S, Ctrl+/, Ctrl+D,
             // multi-cursor with Alt+Click, Ctrl+F find/replace, F2 rename, etc.
           }}
         />
@@ -359,6 +458,11 @@ export default function CollabEditor({
 
       {/* Keybindings cheatsheet (opens via Ctrl/Cmd+K or status bar "?") */}
       <KeybindingsHelp open={showHelp} onClose={() => setShowHelp(false)} />
+
+      {/* VS Code theme picker */}
+      {showThemePicker && (
+        <ThemePicker current={themeId} onPick={pickTheme} onClose={() => setShowThemePicker(false)} />
+      )}
     </div>
   );
 }

@@ -57,7 +57,7 @@ function parseProblems(stderr: string): ProblemRow[] {
 export default function BottomPanel({ result, running, onClose, workspace }: Props) {
   const [tab, setTab] = useState<Tab>('output');
   const [termLines, setTermLines] = useState<{ kind: 'info' | 'cmd' | 'out' | 'err'; text: string }[]>([
-    { kind: 'info', text: 'ASTRA-IDE shell (read-only demo) — ⌘+J to toggle' },
+    { kind: 'info', text: 'ASTRA-IDE shell (read-only demo). Ctrl+J toggles this panel.' },
   ]);
   const termRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +71,7 @@ export default function BottomPanel({ result, running, onClose, workspace }: Pro
       { kind: 'info', text: `[sandbox=${workspace?.sandbox ?? '?'} runtime=${result.runtime_ms}ms]` },
       ...(result.stdout ? result.stdout.split('\n').map((t) => ({ kind: 'out' as const, text: t })) : []),
       ...(result.stderr ? result.stderr.split('\n').map((t) => ({ kind: 'err' as const, text: t })) : []),
-      { kind: 'info', text: `→ exit ${result.exit_code}${result.timeout ? ' (timeout)' : ''}` },
+      { kind: 'info', text: `exit ${result.exit_code}${result.timeout ? ' (timeout)' : ''}` },
     ]);
   }, [result, workspace?.sandbox]);
 
@@ -141,7 +141,7 @@ export default function BottomPanel({ result, running, onClose, workspace }: Pro
               )}
               {result && !result.stdout && !result.stderr && (
                 <p className="text-slate-500 italic">
-                  (no output — exit code {result.exit_code})
+                  (no output; exit code {result.exit_code})
                 </p>
               )}
             </motion.div>
@@ -199,12 +199,12 @@ export default function BottomPanel({ result, running, onClose, workspace }: Pro
                     l.kind === 'out'  && 'text-slate-200',
                     l.kind === 'err'  && 'text-rose-300',
                   )}>
-                    {l.kind === 'cmd' && <span className="text-astra-400 mr-1.5">▸</span>}
+                    {l.kind === 'cmd' && <span className="text-astra-400 mr-1.5">$</span>}
                     {l.text}
                   </div>
                 ))}
                 <div className="flex items-center mt-1 text-slate-400">
-                  <span className="text-astra-400 mr-1.5">▸</span>
+                  <span className="text-astra-400 mr-1.5">$</span>
                   <span className="inline-block w-2 h-3.5 bg-slate-300 animate-pulse" />
                 </div>
               </div>

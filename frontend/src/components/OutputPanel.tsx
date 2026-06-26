@@ -1,5 +1,6 @@
 'use client';
 // Output panel — shows stdout/stderr from the most recent code execution.
+import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { ExecuteResponse } from '../lib/api';
 
@@ -43,7 +44,7 @@ export default function OutputPanel({ result, running, onClose }: Props) {
         </div>
         {onClose && (
           <button onClick={onClose} type="button"
-                  className="text-slate-400 hover:text-slate-200">✕</button>
+                  className="text-slate-400 hover:text-slate-200" title="Close" aria-label="Close"><X size={14} /></button>
         )}
       </div>
 
@@ -59,7 +60,7 @@ export default function OutputPanel({ result, running, onClose }: Props) {
         )}
         {result && !result.stdout && !result.stderr && (
           <span className="text-slate-500 italic">
-            (no output — exit code {result.exit_code})
+            (no output; exit code {result.exit_code})
           </span>
         )}
       </div>
