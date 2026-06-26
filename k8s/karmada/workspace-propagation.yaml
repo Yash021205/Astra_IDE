@@ -1,0 +1,75 @@
+# B5 — Karmada federation policies for ASTRA workspaces.
+# Karmada is the CNCF multi-cluster control plane: you submit a workspace Pod ONCE
+# to the Karmada API, and these policies propagate/schedule it across member
+# clusters. This is the real-cluster counterpart to ml/federation/optimizer.py
+# (the AI-driven placement) — Karmada executes the cross-cluster decision.
+#
+# Apply on the Karmada control plane (see RUNBOOK.md). Member clusters cluster-a
+# (low-carbon, e.g. Denmark) and cluster-b (e.g. India) must be registered first.
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: workspace-policy
+  namespace: astra-ide
+spec:
+  resourceSelectors:
+    - apiVersion: v1
+      kind: Pod
+      labelSelector:
+        matchLabels:
+          app: astra-workspace
+  placement:
+    clusterAffinity:
+      clusterNames: [cluster-a, cluster-b]
+    # Spread/replica policy across clusters. Static weights here are the default;
+    # the AI loop (ml/federation) updates them at runtime to balance load and
+    # route to the lowest-latency / lowest-carbon cluster.
+    replicaScheduling:
+      replicaSchedulingType: Divided
+      weightPreference:
+        staticClusterWeight:
+          - targetCluster: {clusterNames: [cluster-a]}
+            weight: 70          # default bias to low-carbon cluster
+          - targetCluster: {clusterNames: [cluster-b]}
+            weight: 30
+    # Reschedule (migrate) a workspace if its current cluster becomes unhealthy.
+    clusterTolerations:
+      - key: cluster.karmada.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 30
+      - key: cluster.karmada.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 30
+---
+# Per-cluster override: e.g. tag the high-carbon cluster so batch/low-priority
+# workspaces can be steered away from it (ties into B6 carbon-aware scheduling).
+apiVersion: policy.karmada.io/v1alpha1
+kind: OverridePolicy
+metadata:
+  name: workspace-cluster-overrides
+  namespace: astra-ide
+spec:
+  resourceSelectors:
+    - apiVersion: v1
+      kind: Pod
+      labelSelector:
+        matchLabels:
+          app: astra-workspace
+  overrideRules:
+    - targetCluster:
+        clusterNames: [cluster-b]
+      overriders:
+        labelsOverrider:
+          - operator: add
+            value:
+              carbon-profile: high      # India zone — higher gCO2/kWh
+    - targetCluster:
+        clusterNames: [cluster-a]
+      overriders:
+        labelsOverrider:
+          - operator: add
+            value:
+              carbon-profile: low       # Denmark zone — lower gCO2/kWh

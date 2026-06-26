@@ -1,0 +1,28 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt) for ASTRA-IDE.
+# Hostname: 34-14-181-224.sslip.io resolves to the VM's public IP (sslip.io is a
+# free wildcard-DNS service, no registration). Google OAuth requires an HTTPS
+# domain (not a bare IP), which this provides.
+#
+# Routing:
+#   /api/v1/*  -> backend  (terminal WebSocket uses the /api/v1 path directly)
+#   /collab/*  -> collab   (Yjs wss; the /collab prefix is stripped so the room
+#                           name is the first path segment the collab server expects)
+#   everything else -> frontend (Next.js, which server-side proxies /api -> backend)
+
+# Serves both the free sslip.io host and the real domain astraide.tech once its
+# DNS A-record points at this VM (Caddy auto-issues a Let's Encrypt cert per name).
+34-14-181-224.sslip.io, astraide.tech, www.astraide.tech {
+	encode zstd gzip
+
+	handle /api/v1/* {
+		reverse_proxy backend:8000
+	}
+
+	handle_path /collab/* {
+		reverse_proxy collab:1234
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

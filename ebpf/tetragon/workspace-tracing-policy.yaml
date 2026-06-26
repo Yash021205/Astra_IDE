@@ -1,0 +1,40 @@
+# B2 — Tetragon TracingPolicy: capture the kernel telemetry ASTRA needs from
+# workspace pods, at the source. Tetragon (CNCF, eBPF) emits JSON events that
+# ml/telemetry/aggregator.py turns into scheduler features + the IDS syscall
+# stream. Apply on a Linux cluster with Tetragon installed (see RUNBOOK.md).
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: astra-workspace-telemetry
+spec:
+  # Only trace ASTRA workspace pods (label set by sandbox_runtime / B4).
+  podSelector:
+    matchLabels:
+      app: astra-workspace
+  # 1) Process lifecycle — exec/exit (per-PID attribution for HashPipe Top-K).
+  # (Tetragon emits process_exec / process_exit natively for selected pods.)
+  #
+  # 2) Security-relevant syscalls — the sequence the B4 graph IDS consumes, and
+  #    the escape primitives the B4 policy gate cares about.
+  kprobes:
+    - call: "sys_openat"
+      syscall: true
+      args:
+        - index: 1
+          type: "string"           # path being opened
+    - call: "sys_connect"
+      syscall: true
+      args:
+        - index: 0
+          type: "int"              # socket fd (network egress signal)
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"           # binary path (exec chain / escape)
+    - call: "sys_mount"            # container-escape primitive (B4 §2.5)
+      syscall: true
+    - call: "sys_setns"            # namespace join (CVE-2022-0185 class)
+      syscall: true
+    - call: "sys_ptrace"           # host-process injection
+      syscall: true

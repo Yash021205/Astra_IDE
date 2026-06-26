@@ -16,6 +16,10 @@ spec:
       labels:
         app: astra-backend
         component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "8000"
+        prometheus.io/path:   "/metrics"
     spec:
       containers:
       - name: api
@@ -48,6 +52,12 @@ kind: Service
 metadata:
   name: backend
   namespace: astra-ide
+  labels:
+    app: astra-backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port:   "8000"
+    prometheus.io/path:   "/metrics"
 spec:
   selector: { app: astra-backend }
   ports:

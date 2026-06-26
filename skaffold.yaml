@@ -1,0 +1,41 @@
+# Skaffold local dev loop (tech-stack §9). `skaffold dev` builds the backend +
+# frontend + collab images, deploys k8s/base via kustomize, and live-reloads on
+# source changes. `skaffold run` does a one-shot build+deploy.
+#
+#   skaffold dev --default-repo ghcr.io/prasannamishra001
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: astra-ide
+build:
+  artifacts:
+  - image: ghcr.io/prasannamishra001/astra-ide-backend
+    context: backend
+    docker:
+      dockerfile: Dockerfile
+    sync:
+      manual:
+      - src: "app/**/*.py"
+        dest: /app
+  - image: ghcr.io/prasannamishra001/astra-ide-frontend
+    context: frontend
+    docker:
+      dockerfile: Dockerfile
+  - image: ghcr.io/prasannamishra001/astra-ide-collab
+    context: collab-server
+    docker:
+      dockerfile: Dockerfile
+manifests:
+  kustomize:
+    paths:
+    - k8s/base
+deploy:
+  kubectl: {}
+profiles:
+- name: monitoring          # also apply ServiceMonitor when the operator is present
+  manifests:
+    kustomize:
+      paths:
+      - k8s/base
+    rawYaml:
+    - k8s/monitoring/servicemonitor.yaml

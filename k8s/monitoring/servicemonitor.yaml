@@ -1,0 +1,23 @@
+# Prometheus Operator ServiceMonitor — scrapes the backend's /metrics endpoint.
+# Install the stack first:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace
+# The `release: kube-prometheus-stack` label is what the operator selects on.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: astra-backend
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames: ["astra-ide"]
+  selector:
+    matchLabels:
+      app: astra-backend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s

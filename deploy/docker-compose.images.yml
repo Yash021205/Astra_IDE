@@ -1,0 +1,26 @@
+# Pull-based overlay: use the images that GitHub Actions (.github/workflows/
+# docker.yml) builds and pushes to GHCR, instead of building on the VM.
+#
+# This eliminates building on the VM (which thrashes a small box). Flow:
+#   1. Push to main → CI builds + pushes ghcr.io/<owner>/astra-ide-* :latest
+#   2. (one-time) make those 3 GHCR packages PUBLIC in GitHub package settings
+#   3. On the VM:
+#        cd ~/astra-ide/deploy
+#        PUBLIC_HOST=34.14.181.224 WORKSPACE_DATA_HOST=/opt/astra/workspace_data \
+#          docker compose -f docker-compose.yml -f docker-compose.https.yml \
+#                         -f docker-compose.images.yml pull
+#        PUBLIC_HOST=34.14.181.224 WORKSPACE_DATA_HOST=/opt/astra/workspace_data \
+#          docker compose -f docker-compose.yml -f docker-compose.https.yml \
+#                         -f docker-compose.images.yml up -d --no-build
+#
+# (If the packages are private, run `docker login ghcr.io` on the VM first.)
+services:
+  backend:
+    image: ghcr.io/prasannamishra001/astra-ide-backend:latest
+    pull_policy: always
+  frontend:
+    image: ghcr.io/prasannamishra001/astra-ide-frontend:latest
+    pull_policy: always
+  collab:
+    image: ghcr.io/prasannamishra001/astra-ide-collab-server:latest
+    pull_policy: always

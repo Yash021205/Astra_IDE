@@ -11,6 +11,7 @@
 
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_USER:     astra
@@ -25,6 +26,7 @@ services:
       retries: 10
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     ports: ["6379:6379"]
     healthcheck:
@@ -33,6 +35,7 @@ services:
       retries: 10
 
   minio:
+    restart: unless-stopped
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
@@ -49,47 +52,66 @@ services:
       retries: 10
 
   backend:
+    restart: unless-stopped
     build:
       context: ../backend
       dockerfile: Dockerfile
-    # Loads carbon token + any other secrets from backend/.env (gitignored).
-    # Values in `environment:` below take precedence over this file.
+    # Optionally loads carbon token + other secrets from backend/.env (gitignored).
+    # `required: false` lets a fresh clone run with no .env present — those
+    # features fall back gracefully (carbon uses a historical average, Google
+    # OAuth stays disabled). Values in `environment:` below take precedence.
     env_file:
-      - ../backend/.env
+      - path: ../backend/.env
+        required: false
     environment:
       DATABASE_URL:    postgresql+psycopg2://astra:astra_dev@postgres:5432/astra
       REDIS_URL:       redis://redis:6379/0
       JWT_SECRET:      dev-secret-change-me-in-production
       COLLAB_WS_URL:   ws://collab:1234
       MINIO_ENDPOINT:  http://minio:9000
-      CORS_ORIGINS:    '["http://localhost:3000"]'
+      CORS_ORIGINS:    '["http://localhost:3000", "http://${PUBLIC_HOST:-localhost}:3000"]'
+      # Real per-workspace containers (Start → docker run; terminal → docker exec).
+      ENABLE_REAL_CONTAINERS: "${ENABLE_REAL_CONTAINERS:-1}"
+      ASTRA_WORKSPACE_DATA:   /app/workspace_data
+      WORKSPACE_DATA_HOST:    ${WORKSPACE_DATA_HOST:-/opt/astra/workspace_data}
     ports: ["8000:8000"]
+    volumes:
+      # Manage real containers + share the workspace files with them (the host
+      # path must match WORKSPACE_DATA_HOST so nested bind-mounts resolve).
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${WORKSPACE_DATA_HOST:-/opt/astra/workspace_data}:/app/workspace_data
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
       minio:    { condition: service_healthy }
 
   collab:
+    restart: unless-stopped
     build:
       context: ../collab-server
       dockerfile: Dockerfile
     ports: ["1234:1234"]
 
   frontend:
+    restart: unless-stopped
     build:
       context: ../frontend
       dockerfile: Dockerfile
       # Next.js bakes rewrites + NEXT_PUBLIC_* into the production build, so
       # we MUST pass these as build-args (not just runtime env vars).
       # Set PUBLIC_HOST to the public IP/domain that users hit in their browser:
-      #   PUBLIC_HOST=34.47.224.18 docker compose up -d --build frontend
+      #   PUBLIC_HOST=34.14.181.224 docker compose up -d --build frontend
       args:
         BACKEND_URL:                http://backend:8000
         NEXT_PUBLIC_COLLAB_WS_URL:  ws://${PUBLIC_HOST:-localhost}:1234
+        # Production `next start` does not proxy WebSocket upgrades, so the
+        # terminal connects straight to the backend's public port.
+        NEXT_PUBLIC_BACKEND_WS_URL: ws://${PUBLIC_HOST:-localhost}:8000
     environment:
       # Same values also set at runtime so server-side rewrites can read them.
       BACKEND_URL:                http://backend:8000
       NEXT_PUBLIC_COLLAB_WS_URL:  ws://${PUBLIC_HOST:-localhost}:1234
+      NEXT_PUBLIC_BACKEND_WS_URL: ws://${PUBLIC_HOST:-localhost}:8000
     ports: ["3000:3000"]
     depends_on:
       - backend

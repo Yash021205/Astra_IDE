@@ -1,0 +1,57 @@
+{
+  "title": "ASTRA-IDE — Platform Overview",
+  "uid": "astra-ide-overview",
+  "schemaVersion": 39,
+  "tags": ["astra-ide", "btp"],
+  "timezone": "browser",
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "HTTP request rate (by path)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum by (path) (rate(astra_http_requests_total[5m]))", "legendFormat": "{{path}}" }
+      ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "HTTP p95 latency (s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(astra_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "id": 3, "type": "piechart", "title": "Sandbox tier distribution (B4)",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum by (tier) (astra_sandbox_tier_total)", "legendFormat": "{{tier}}" }
+      ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Workspaces created",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [ { "expr": "sum(astra_workspaces_created_total)" } ]
+    },
+    {
+      "id": 5, "type": "stat", "title": "Scheduler decisions (PPO, B1)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [ { "expr": "sum(astra_scheduler_decisions_total)" } ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Live grid carbon intensity gCO2/kWh (B6)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "astra_carbon_intensity_gco2", "legendFormat": "{{zone}}" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Pending-workspace queue (KEDA scale signal)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "workspace_pending_queue_total", "legendFormat": "pending" }
+      ]
+    }
+  ]
+}

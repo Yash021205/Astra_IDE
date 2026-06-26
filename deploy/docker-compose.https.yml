@@ -1,0 +1,42 @@
+# HTTPS overlay for the public deployment. Adds Caddy (automatic Let's Encrypt)
+# in front and rebuilds the frontend with wss:// URLs through the domain, so
+# Google OAuth (which requires an HTTPS domain) works and the whole demo is TLS.
+#
+# Deploy on the VM:
+#   cd ~/astra-ide/deploy
+#   DOMAIN=34-14-181-224.sslip.io \
+#     docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+#
+# Then access https://34-14-181-224.sslip.io  (http://<ip>:3000 still works too).
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+      - collab
+
+  frontend:
+    build:
+      args:
+        # WS URLs are now derived at runtime from window.location (see lib/ws.ts),
+        # so the app works on any domain. These remain only as a dev fallback.
+        NEXT_PUBLIC_COLLAB_WS_URL:  wss://astraide.tech/collab
+        NEXT_PUBLIC_BACKEND_WS_URL: wss://astraide.tech
+
+  backend:
+    environment:
+      FRONTEND_URL: https://astraide.tech
+      CORS_ORIGINS: '["https://astraide.tech","https://www.astraide.tech","https://34-14-181-224.sslip.io","http://34.14.181.224:3000","http://localhost:3000"]'
+
+volumes:
+  caddy_data:
+  caddy_config:
