@@ -29,7 +29,7 @@ export default function CanvasText({
   height     = 200,
   fontSize   = 96,
   fontWeight = 800,
-  gradient   = ['#60a5fa', '#a855f7', '#ec4899'],
+  gradient   = ['#dedbd2', '#b0c4b1', '#edafb8'],
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

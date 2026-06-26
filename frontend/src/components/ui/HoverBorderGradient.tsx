@@ -24,7 +24,7 @@ export default function HoverBorderGradient({
       <span
         className="absolute inset-0 rounded-full opacity-60 transition-opacity duration-500 group-hover:opacity-100"
         style={{
-          background: 'conic-gradient(from 0deg, #3b82f6, #a855f7, #ec4899, #3b82f6)',
+          background: 'conic-gradient(from 0deg, #4a5759, #b0c4b1, #edafb8, #4a5759)',
           animation:  'spin 6s linear infinite',
         }}
       />

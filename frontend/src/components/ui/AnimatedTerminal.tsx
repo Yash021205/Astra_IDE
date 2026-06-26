@@ -15,11 +15,14 @@ export interface TerminalLine {
 
 export default function AnimatedTerminal({
   lines, className, title = 'astra-ide@cloud', autoLoop = true,
+  speedMul = 1, bodyHeight = 280,
 }: {
-  lines:     TerminalLine[];
-  className?: string;
-  title?:    string;
-  autoLoop?: boolean;
+  lines:      TerminalLine[];
+  className?:  string;
+  title?:     string;
+  autoLoop?:  boolean;
+  speedMul?:  number;     // >1 = slower typing
+  bodyHeight?: number;    // px height of the output area
 }) {
   const [shown, setShown] = useState<TerminalLine[]>([]);
   const [typing, setTyping] = useState<string>('');
@@ -39,8 +42,8 @@ export default function AnimatedTerminal({
       return;
     }
     const line = lines[cursor];
-    const delay = line.delay ?? (line.kind === 'cmd' ? 400 : 200);
-    const speed = line.speed ?? (line.kind === 'cmd' ? 30 : 8);
+    const delay = (line.delay ?? (line.kind === 'cmd' ? 400 : 200)) * speedMul;
+    const speed = (line.speed ?? (line.kind === 'cmd' ? 30 : 8)) * speedMul;
 
     const start = setTimeout(() => {
       let i = 0;
@@ -57,7 +60,7 @@ export default function AnimatedTerminal({
       }, speed);
     }, delay);
     return () => clearTimeout(start);
-  }, [cursor, lines, autoLoop]);
+  }, [cursor, lines, autoLoop, speedMul]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -87,7 +90,8 @@ export default function AnimatedTerminal({
       </div>
 
       {/* Output area */}
-      <div ref={containerRef} className="p-4 h-[280px] overflow-y-auto leading-relaxed">
+      <div ref={containerRef} className="p-4 overflow-y-auto leading-relaxed"
+           style={{ height: bodyHeight }}>
         {shown.map((line, idx) => (
           <div key={idx} className={cn('whitespace-pre-wrap', colorFor(line.kind))}>
             {line.prompt && <span className="text-astra-500 mr-2">{line.prompt}</span>}
