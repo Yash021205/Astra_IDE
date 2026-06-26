@@ -38,6 +38,9 @@ export interface User {
   username: string;
   trust_score: number;
   preferred_lang: string;
+  avatar_url?: string | null;
+  is_admin?: boolean;
+  github_login?: string | null;  // null = GitHub not linked
 }
 
 export interface TokenResponse {
@@ -62,10 +65,14 @@ export interface Workspace {
   pod_name: string;
   yjs_room: string;
   owner_id: number;
+  forked_from_id?: number | null;
+  frozen?: boolean;
   created_at: string;
   updated_at: string;
   last_active_at: string;
 }
+
+export type SandboxTier = 'runc' | 'gvisor' | 'firecracker';
 
 export interface WorkspaceCreate {
   name: string;
@@ -75,6 +82,8 @@ export interface WorkspaceCreate {
   cpu_request?: number;
   memory_request?: number;
   initial_code?: string;
+  /** null/undefined = Auto (adaptive risk-scored tier); or pin explicitly. */
+  sandbox_override?: SandboxTier | null;
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -97,6 +106,15 @@ export async function login(username_or_email: string, password: string): Promis
 
 export async function fetchMe(): Promise<User> {
   const { data } = await api.get<User>('/auth/me');
+  return data;
+}
+
+// Load the current user with an explicit token (used by the OAuth callback,
+// before the token has been persisted to localStorage for the interceptor).
+export async function fetchMeWithToken(token: string): Promise<User> {
+  const { data } = await api.get<User>('/auth/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   return data;
 }
 
@@ -131,11 +149,21 @@ export async function deleteWorkspace(id: number): Promise<void> {
   await api.delete(`/workspaces/${id}`);
 }
 
+export async function updateWorkspace(
+  id: number,
+  payload: { name?: string; sandbox_override?: SandboxTier },
+): Promise<Workspace> {
+  const { data } = await api.patch<Workspace>(`/workspaces/${id}`, payload);
+  return data;
+}
+
 // ── Sharing ────────────────────────────────────────────────────────────────
 
 export interface WorkspaceMember {
   user_id:  number;
   username: string;
+  email?:   string | null;
+  avatar_url?: string | null;
   role:     'owner' | 'editor' | 'viewer';
   added_at: string;
 }
@@ -177,6 +205,126 @@ export async function executeCode(
     `/workspaces/${workspaceId}/execute`,
     { language, code, stdin },
   );
+  return data;
+}
+
+// ── Workspace files + GitHub import ────────────────────────────────────────
+
+export interface WsFile { path: string; type: 'file' | 'dir'; size?: number; }
+
+export async function importRepo(workspaceId: number, gitUrl: string):
+  Promise<{ ok: boolean; detail: string; file_count: number }> {
+  const { data } = await api.post(`/workspaces/${workspaceId}/import-repo`, { git_url: gitUrl });
+  return data;
+}
+export async function listFiles(workspaceId: number): Promise<WsFile[]> {
+  const { data } = await api.get<{ files: WsFile[] }>(`/workspaces/${workspaceId}/files`);
+  return data.files;
+}
+export async function readFile(workspaceId: number, path: string): Promise<string> {
+  const { data } = await api.get<{ content: string }>(
+    `/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
+  return data.content;
+}
+export async function writeFile(workspaceId: number, path: string, content: string): Promise<void> {
+  await api.put(`/workspaces/${workspaceId}/file`, { path, content });
+}
+export async function makeDir(workspaceId: number, path: string): Promise<void> {
+  await api.post(`/workspaces/${workspaceId}/mkdir`, { path });
+}
+export async function deletePath(workspaceId: number, path: string): Promise<void> {
+  await api.delete(`/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
+}
+export async function snapshotWorkspace(workspaceId: number):
+  Promise<{ ok: boolean; detail: string; key: string; size: number }> {
+  const { data } = await api.post(`/workspaces/${workspaceId}/snapshot`);
+  return data;
+}
+
+export interface SearchHit { path: string; line: number; text: string; }
+export async function searchWorkspace(workspaceId: number, q: string): Promise<SearchHit[]> {
+  const { data } = await api.get<{ results: SearchHit[] }>(
+    `/workspaces/${workspaceId}/search?q=${encodeURIComponent(q)}`);
+  return data.results;
+}
+
+export async function forkWorkspace(workspaceId: number): Promise<Workspace> {
+  const { data } = await api.post<Workspace>(`/workspaces/${workspaceId}/fork`);
+  return data;
+}
+
+/** Raw-file URL for <img> previews (token in query since img can't set headers). */
+function authToken(): string {
+  try {
+    const raw = window.localStorage.getItem('astra-auth');
+    return raw ? (JSON.parse(raw)?.state?.token ?? '') : '';
+  } catch { return ''; }
+}
+
+export function rawFileUrl(workspaceId: number, path: string): string {
+  return `/api/workspaces/${workspaceId}/raw?path=${encodeURIComponent(path)}&token=${encodeURIComponent(authToken())}`;
+}
+
+/** Static-preview URL for an in-iframe live preview. */
+export function previewUrl(workspaceId: number, path = 'index.html'): string {
+  return `/api/workspaces/${workspaceId}/preview/${path}?token=${encodeURIComponent(authToken())}`;
+}
+
+// ── Change history / exclusions / freeze ─────────────────────────────────────
+
+export interface EditEntry {
+  username: string; path: string; lines_added: number; lines_removed: number; created_at: string;
+}
+export async function getHistory(workspaceId: number): Promise<EditEntry[]> {
+  const { data } = await api.get<EditEntry[]>(`/workspaces/${workspaceId}/history`);
+  return data;
+}
+export async function getExcludes(workspaceId: number): Promise<string[]> {
+  const { data } = await api.get<{ excludes: string[] }>(`/workspaces/${workspaceId}/excludes`);
+  return data.excludes;
+}
+export async function setExcludes(workspaceId: number, excludes: string[]): Promise<void> {
+  await api.put(`/workspaces/${workspaceId}/excludes`, { excludes });
+}
+export async function setFrozen(workspaceId: number, frozen: boolean): Promise<Workspace> {
+  const { data } = await api.patch<Workspace>(`/workspaces/${workspaceId}`, { frozen });
+  return data;
+}
+
+// ── Profile (avatar via imgbb) ───────────────────────────────────────────────
+
+export async function updateProfile(avatar_url: string): Promise<User> {
+  const { data } = await api.patch<User>('/auth/me', { avatar_url });
+  return data;
+}
+
+const IMGBB_KEY = '867d7e2c0a3447bae67174900d476c9f';
+/** Upload an image to imgbb and return the hosted URL. */
+export async function uploadToImgbb(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+    method: 'POST', body: form,
+  });
+  const json = await res.json();
+  if (!json?.data?.url) throw new Error(json?.error?.message || 'Upload failed');
+  return json.data.url as string;
+}
+
+// ── System status (live infra backends) ────────────────────────────────────
+
+export interface SystemStatus {
+  environment:   string;
+  database:      string;
+  cache_backend: string;
+  object_store:  string;
+  metrics:       string;
+  carbon_api:    string;
+  google_oauth:  string;
+}
+
+export async function getSystemStatus(): Promise<SystemStatus> {
+  const { data } = await api.get<SystemStatus>('/system/status');
   return data;
 }
 
@@ -275,4 +423,160 @@ export async function runBenchmark(n_jobs = 200, seed = 42): Promise<BenchmarkRe
   return data;
 }
 
+export interface BenchmarkRunLog {
+  id:               number;
+  created_at:       string;
+  username:         string;
+  n_jobs:           number;
+  seed:             number;
+  winner:           string;
+  ppo_latency_ms:   number;
+  ppo_util_pct:     number;
+  ppo_balance:      number;
+  ppo_sla:          number;
+  latency_gain_pct: number;
+}
+
+export async function getBenchmarkHistory(limit = 20): Promise<BenchmarkRunLog[]> {
+  const { data } = await api.get<BenchmarkRunLog[]>(`/benchmarks/history?limit=${limit}`);
+  return data;
+}
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+export interface AdminWorkspace {
+  id: number; name: string; language: string; sandbox_tier: string; status: string;
+  cpu_cores?: number | null; memory_mb?: number | null; cluster_id?: string | null; risk_score?: number | null;
+}
+export interface AdminUser {
+  id: number; username: string; email: string; is_admin: boolean; trust_score: number;
+  created_at: string; avatar_url?: string | null;
+  workspace_count: number; running_count: number;
+  tiers: Record<string, number>; total_cpu: number; total_mem_mb: number;
+  edits: number; shares: number; benchmark_runs: number;
+  features: string[]; workspaces: AdminWorkspace[];
+}
+export interface AdminOverview {
+  total_users: number; total_workspaces: number; running_workspaces: number;
+  total_edits: number; total_benchmark_runs: number; users: AdminUser[];
+}
+export async function getAdminUsers(): Promise<AdminOverview> {
+  const { data } = await api.get<AdminOverview>('/admin/users');
+  return data;
+}
+
+// ── Sandbox observability ────────────────────────────────────────────────────
+export interface SandboxTierMetric {
+  tier: string; label: string; startup_ms: number; cpu_overhead_pct: number;
+  syscall_us: number; memory_mb: number; isolation: string;
+}
+export interface SandboxMetrics {
+  timestamp: string; tiers: SandboxTierMetric[]; note: string;
+}
+export async function getSandboxMetrics(): Promise<SandboxMetrics> {
+  const { data } = await api.get<SandboxMetrics>('/metrics/sandbox');
+  return data;
+}
+
+// ── Pods (container management) ──────────────────────────────────────────────
+export interface PodInfo {
+  id: number; name: string; status: string; language: string; sandbox_tier: string;
+  runtime_class: string; image: string; cluster_id: string; node_name: string; pod_name: string;
+  cpu_request: number; memory_request: number; cpu_pct: number; mem_pct: number; mem_mb: number;
+  restarts: number; uptime_s: number; created_at: string;
+}
+export async function getPods(): Promise<PodInfo[]> {
+  const { data } = await api.get<PodInfo[]>('/pods');
+  return data;
+}
+export async function getPodLogs(workspaceId: number): Promise<{ pod_name: string; lines: string[] }> {
+  const { data } = await api.get<{ pod_name: string; lines: string[] }>(`/pods/${workspaceId}/logs`);
+  return data;
+}
+
+export async function uploadFiles(workspaceId: number, files: FileList | File[], dest = ''): Promise<string[]> {
+  const form = new FormData();
+  Array.from(files).forEach((f) => form.append('files', f));
+  if (dest) form.append('dest', dest);
+  const { data } = await api.post<{ uploaded: string[] }>(`/workspaces/${workspaceId}/upload`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data.uploaded;
+}
+
 export default api;
+
+// ── GitHub integration ────────────────────────────────────────────────────────
+
+export interface GitHubRepo {
+  id:               number;
+  name:             string;
+  full_name:        string;
+  private:          boolean;
+  description?:     string | null;
+  default_branch:   string;
+  clone_url:        string;
+  html_url:         string;
+  updated_at?:      string | null;
+  language?:        string | null;
+  stargazers_count: number;
+  forks_count:      number;
+}
+
+export interface GitHubBranch {
+  name: string;
+  sha:  string;
+}
+
+export interface GitHubStatus {
+  connected:    boolean;
+  github_login: string | null;
+  avatar_url?:  string | null;
+}
+
+export async function getGitHubStatus(): Promise<GitHubStatus> {
+  const { data } = await api.get<GitHubStatus>('/github/status');
+  return data;
+}
+
+export async function disconnectGitHub(): Promise<void> {
+  await api.delete('/github/disconnect');
+}
+
+export async function listGitHubRepos(page = 1, perPage = 50): Promise<GitHubRepo[]> {
+  const { data } = await api.get<{ repos: GitHubRepo[]; page: number; total: number }>(
+    `/github/repos?page=${page}&per_page=${perPage}`,
+  );
+  return data.repos;
+}
+
+export async function listGitHubBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
+  const { data } = await api.get<{ branches: GitHubBranch[] }>(
+    `/github/repos/${owner}/${repo}/branches`,
+  );
+  return data.branches;
+}
+
+export async function createGitHubBranch(
+  owner: string, repo: string, newBranch: string, fromBranch: string,
+): Promise<GitHubBranch> {
+  const { data } = await api.post<GitHubBranch>(
+    `/github/repos/${owner}/${repo}/branches`,
+    { owner, repo, new_branch: newBranch, from_branch: fromBranch },
+  );
+  return data;
+}
+
+export async function cloneRepoToWorkspace(
+  workspaceId: number, owner: string, repo: string, branch?: string,
+): Promise<{ ok: boolean; detail: string; file_count: number; repo: string }> {
+  const { data } = await api.post('/github/clone', { workspace_id: workspaceId, owner, repo, branch });
+  return data;
+}
+
+export async function commitAndPush(
+  owner: string, repo: string, branch: string,
+  path: string, content: string, message: string,
+): Promise<{ ok: boolean; commit_sha: string; html_url: string }> {
+  const { data } = await api.post('/github/commit', { owner, repo, branch, path, content, message });
+  return data;
+}

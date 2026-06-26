@@ -15,6 +15,7 @@ interface AuthState {
   user:     User | null;
   hydrated: boolean;
   setSession:   (token: string, user: User) => void;
+  setUser:      (user: User) => void;
   clearSession: () => void;
   setHydrated:  () => void;
 }
@@ -27,6 +28,7 @@ export const useAuth = create<AuthState>()(
       hydrated: false,
       setHydrated:  () => set({ hydrated: true }),
       setSession:   (token, user) => set({ token, user }),
+      setUser:      (user) => set({ user }),
       clearSession: () => set({ token: null, user: null }),
     }),
     {
