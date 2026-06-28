@@ -1,24 +1,138 @@
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="ASTRA-IDE, a self-scheduling cloud IDE" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://astraide.tech"><b>astraide.tech</b></a>
+  &nbsp;&middot;&nbsp; Deep-RL scheduling &nbsp;&middot;&nbsp; gVisor sandboxing &nbsp;&middot;&nbsp; eBPF telemetry &nbsp;&middot;&nbsp; Kubernetes federation &nbsp;&middot;&nbsp; carbon-aware &nbsp;&middot;&nbsp; real-time collaboration
+</p>
+
 # ASTRA-IDE
 
-**Adaptive Scheduling & Telemetry-driven Resource-aware Cloud IDE**
+**A cloud development environment with a self-optimizing control plane.**
 
-A cloud development environment combining **DRL-PPO scheduling**, **eBPF observability**,
-**adaptive sandboxing** (runc / gVisor / Firecracker), **LSTM-based predictive prewarming**,
-**multi-cluster Karmada federation**, **carbon-aware scheduling**, and **Yjs CRDT
-collaboration** in one open research platform.
+ASTRA-IDE is a browser-based cloud IDE where every workspace runs as an isolated, server-side
+sandbox. What sets it apart is the control plane: scheduling, isolation, observability, and
+placement are adaptive, data-driven decisions rather than fixed configuration. A reinforcement
+learning scheduler places workloads, a risk model selects the cheapest sufficient sandbox,
+eBPF traces syscalls, a forecaster pre-warms containers, Kubernetes federation provides
+failover, placement follows the cleanest available electricity, and editing is collaborative in
+real time.
 
+Live: **https://astraide.tech**
+
+Keywords: cloud IDE, reinforcement-learning scheduler, gVisor sandboxing, eBPF observability,
+Kubernetes, Karmada multi-cluster federation, carbon-aware scheduling, CRDT collaboration,
+Monaco editor, FastAPI, Next.js.
 
 ---
 
-## Team
+## What it is
 
-Sorted by roll number.
+Cloud IDEs such as GitHub Codespaces, Gitpod, and Replit fix their scheduling, isolation, and
+placement policies. ASTRA-IDE treats each of those as a measurable optimization. The result is
+a working IDE (Monaco editor, real per-workspace containers, an integrated terminal, code
+execution, and live collaboration) sitting on top of seven research contributions, each with
+its own evaluation harness and a real-dataset benchmark.
 
-| Roll | Name | Role |
+The platform runs today on a single host via Docker Compose and scales out to Kubernetes with
+gVisor sandboxing, Karmada federation, and Tetragon-based eBPF telemetry.
+
+---
+
+## Key features
+
+- **Learned workload scheduling.** A PPO reinforcement-learning agent (PF-MPPO) places each
+  workspace's startup task graph across heterogeneous nodes, trained on the Google Cluster
+  Trace 2011. It replaces round-robin and FIFO heuristics and falls back to a heuristic scorer
+  automatically if the model is unavailable.
+- **Adaptive sandboxing.** A static risk model scores each workload and assigns the cheapest
+  isolation tier that is strong enough (runc, gVisor, or Firecracker) instead of paying the
+  worst-case overhead for everyone.
+- **Graph-based intrusion detection.** A multi-scale syscall-graph anomaly detector flags
+  container escapes and exploits from syscall behavior, trained on normal traffic only.
+- **eBPF observability.** Tetragon captures per-workspace syscall and resource telemetry in the
+  kernel with near-zero overhead, feeding both the scheduler and the intrusion detector.
+- **Predictive pre-warming.** An LSTM forecasts session demand and adapts container keep-alive
+  windows, cutting cold-start latency.
+- **Multi-cluster federation.** Karmada spreads workspaces across clusters with automatic
+  failover; a global optimizer balances load ahead of demand.
+- **Carbon-aware placement.** Deferrable work is shifted toward low-carbon grid windows using
+  live carbon-intensity data.
+- **Real-time collaboration.** Multiple users edit the same file concurrently with conflict-free
+  CRDT synchronization (Yjs) and live cursors.
+
+---
+
+## Benchmark results
+
+Each contribution is evaluated on a real public dataset. Representative numbers:
+
+| Area | Dataset | Result |
 |---|---|---|
-| 2023IMT-059 | **Prasanna Mishra**  
-| 2023IMT-084 | **Udit Srivastava**        
-| 2023IMT-087 | **Yash Wani**              
+| Intrusion detection | LID-DS 2021 (real CVE exploits) | F1 **0.82**, precision 0.95, FPR 0.04; beats STIDE (0.75) and a frequency baseline (0.73) |
+| Predictive pre-warming | Azure Functions 2019 | forecast N-RMSE **0.17**; **49%** fewer cold starts vs a fixed keep-alive window |
+| Carbon-aware scheduling | UK grid carbon intensity | up to **30%** lower emissions at a 24-hour deferral budget |
+| Learned scheduling | Google Cluster Trace 2011 | PPO policy trained on the real trace; outperforms random workspace placement |
+
+Evaluation harnesses live under `benchmarks/`; trained model artifacts and their metrics live
+under `ml/*/artifacts/`.
+
+---
+
+## Architecture
+
+A browser client (Next.js and Monaco) talks to a FastAPI backend behind a Caddy reverse proxy
+with automatic HTTPS. The backend scores each new workspace for risk, asks the scheduler for a
+placement, and launches an isolated container under the selected runtime. A separate WebSocket
+service relays CRDT document updates for collaboration. PostgreSQL holds durable state, Redis
+provides caching, and MinIO stores workspace files. At cluster scale the same workloads run as
+Kubernetes pods federated by Karmada, observed by Tetragon, and isolated by gVisor.
+
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="ASTRA-IDE system architecture" width="100%">
+</p>
+
+---
+
+## Tech stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, Monaco Editor, Yjs, Framer Motion |
+| Backend | FastAPI, SQLAlchemy 2.0, Pydantic v2, PostgreSQL, Redis, MinIO, JWT |
+| Machine learning | PyTorch, Gymnasium, scikit-learn, NumPy, pandas |
+| Runtime and infra | Docker, Kubernetes, Karmada, Helm, KEDA, Tetragon (eBPF), Prometheus, Grafana |
+| Sandboxing | runc, gVisor (runsc), Firecracker via Kata Containers |
+| Collaboration | Node.js, y-websocket |
+| Delivery | GitHub Actions, GHCR, Caddy |
+
+---
+
+## Run it locally
+
+Requirements: Docker Desktop (or Docker Engine and Compose) and Git.
+
+```bash
+git clone https://github.com/PrasannaMishra001/astra-ide.git
+cd astra-ide/deploy
+docker compose up --build
+```
+
+First build takes a few minutes; subsequent starts take seconds. Then open:
+
+- Frontend: http://localhost:3000
+- Backend API docs: http://localhost:8000/api/v1/docs
+- Collaboration server health: http://localhost:1234/healthz
+
+No configuration is required. Optional features (Google and GitHub sign-in, live
+carbon-intensity data) activate when their credentials are set in `backend/.env`; without them
+the platform falls back gracefully. Stop with `docker compose down`, or
+`docker compose down -v` to also remove data.
+
+<p align="center">
+  <img src="docs/assets/setup.png" alt="ASTRA-IDE local setup with Docker Compose" width="90%">
+</p>
 
 ---
 
@@ -26,170 +140,19 @@ Sorted by roll number.
 
 ```
 astra-ide/
-├── backend/            FastAPI service: auth, workspace API, scheduler, events, metrics
-├── frontend/           Next.js 14 + Monaco + Yjs + Aceternity-style components
-├── collab-server/      y-websocket relay for collaborative editing
-├── ml/
-│   ├── scheduler/      PPO agent + Gymnasium env + reward function
-│   ├── prewarming/     LSTM session-start predictor + synthetic dataset
-│   └── risk_scorer/    Workload risk -> sandbox tier selector
-├── ebpf/               libbpf probes + Go telemetry aggregator (planned)
-├── k8s/                Helm charts, manifests, Karmada policies, RuntimeClasses
-├── deploy/             docker-compose for local + prod
-├── docs/
-│   ├── LEARNING_AND_TASKS.md   role-specific stack to learn + concrete tickets
-│   ├── TEAM_GUIDE.md           week-by-week task split, ops runbook
-│   ├── ARCHITECTURE.md         system diagram + data flow
-│   ├── API.md                  REST API reference
-│   ├── ML.md                   PPO / LSTM training docs
-│   ├── DEPLOY.md               production deploy guide
-│   └── DEVELOPMENT.md          contributor conventions
-└── .github/workflows/  CI tests + Docker image build
+  backend/         FastAPI service: auth, workspaces, scheduling, risk scoring, telemetry
+  frontend/        Next.js IDE: Monaco editor, collaboration, dashboards
+  collab-server/   y-websocket relay for CRDT collaboration
+  ml/              scheduler (PPO), prewarming (LSTM), risk scorer, anomaly IDS, telemetry,
+                   federation, carbon; trained artifacts under ml/*/artifacts/
+  benchmarks/      per-contribution evaluation harnesses on real datasets
+  ebpf/            Tetragon tracing policy
+  k8s/             manifests, Helm chart, Karmada policies, RuntimeClasses, monitoring
+  deploy/          Docker Compose stacks and the Caddy reverse proxy
 ```
-
----
-
-## Quick start (everyone reads this first)
-
-### 1. Prerequisites
-
-- **Git** + a GitHub account (added as collaborator on this private repo)
-- **Docker Desktop** (Mac/Windows) or Docker Engine + Compose (Linux)
-- **Python 3.12+** and **Node 20+** if you want to run backend/frontend natively
-- An IDE (VS Code recommended)
-
-### 2. Clone
-
-```bash
-git clone https://github.com/Yash021205/Astra_IDE.git
-cd Astra_IDE
-```
-
-### 3. Quickest path: full stack via Docker Compose (one command)
-
-With only **Docker Desktop + Git** installed, a fresh clone runs the entire
-platform (Postgres + Redis + MinIO + backend + collab + frontend) with no config:
-
-```bash
-cd deploy
-docker compose up --build       # first build ~5 min; then ~20s on restarts
-```
-
-Open:
-- Frontend: <http://localhost:3000>
-- Backend Swagger: <http://localhost:8000/api/v1/docs>
-- Collab WS health: <http://localhost:1234/healthz>
-
-No `.env` is required: optional features (electricityMaps carbon token, Google
-OAuth) fall back gracefully when unset. To enable them, copy
-`backend/.env.example` to `backend/.env` and fill in the values before bringing
-the stack up.
-
-Stop: `docker compose down`  ·  reset data too: `docker compose down -v`.
-
-### 4. Native dev (faster iteration, hot reload)
-
-Run only the data plane in Docker, then code natively:
-
-```bash
-# Data plane (Postgres + Redis + MinIO + collab server)
-docker compose -f deploy/docker-compose.dev.yml up -d
-```
-
-Backend:
-```bash
-cd backend
-python -m venv venv
-# Windows:  venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env                # edit with your tokens
-uvicorn app.main:app --reload --port 8000
-```
-
-Frontend (in a separate shell):
-```bash
-cd frontend
-npm install --legacy-peer-deps
-cp .env.local.example .env.local    # if it exists
-npm run dev                          # http://localhost:3000
-```
-
-### 5. Run the test suites
-
-```bash
-# ML tests (no extra deps required)
-python -m unittest \
-  ml.risk_scorer.test_scorer \
-  ml.scheduler.test_env \
-  ml.prewarming.test_dataset -v
-
-# Backend tests
-cd backend && python -m unittest discover -s tests -v
-
-# Frontend type-check + build
-cd frontend && npx tsc --noEmit && npm run build
-```
-
----
-
-## Tech stack at a glance
-
-| Layer | Stack |
-|---|---|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind, Monaco Editor, Yjs + y-monaco, Framer Motion, Zustand, Axios |
-| Backend  | FastAPI, SQLAlchemy 2.0, Pydantic v2, PostgreSQL / SQLite, Redis, JWT, asyncio |
-| Collab   | Node.js + `y-websocket` |
-| ML       | PyTorch, Stable-Baselines3 (PPO), Gymnasium, NumPy, pandas |
-| Infra    | Docker, k3s, Karmada, Helm, KEDA, Tetragon (eBPF), Prometheus, Grafana, MinIO |
-| Sandbox  | runc, gVisor (runsc), Firecracker (via Kata Containers) |
-| CI       | GitHub Actions, GHCR for container images |
-| External | electricityMaps API (carbon intensity) |
-
-For learning paths organized by role, see [`docs/LEARNING_AND_TASKS.md`](docs/LEARNING_AND_TASKS.md).
-For week-by-week task split, see [`docs/TEAM_GUIDE.md`](docs/TEAM_GUIDE.md).
-
----
-
-## What's working today
-
-- Risk-scored adaptive sandboxing (runc / gvisor / firecracker assignment)
-- PPO-style placement scheduler with cluster_state + reward function
-- Live electricityMaps carbon API + fallback table
-- Persistent SchedulerEvent log + activity feed (polled by frontend)
-- Live cluster metrics endpoint, polled by `/clusters` page
-- Benchmarks page with PPO vs Round-Robin / Random / FIFO / Least-Loaded
-- Workspace CRUD with sharing, role-based access
-- Code execution (Python, C++, JavaScript, Bash) with 5s timeout
-- Yjs CRDT collaboration in Monaco (multi-cursor, awareness, multi-tab sync)
-- VS Code-style editor UI (status bar, keybindings cheatsheet, command palette,
-  tabbed bottom panel — output / problems / terminal)
-- Toast notifications, workspace templates, 3D card effects, interactive globe
-
-## What's not yet wired (see `docs/LEARNING_AND_TASKS.md` Part C)
-
-- Trained PPO model file checked in
-- Trained LSTM weights checked in
-- Live K8s cluster (currently using in-memory mock)
-- Tetragon eBPF actually deployed
-- gVisor + Firecracker on a real node
-- Second cluster + Karmada
-- xterm.js terminal panel
-- LSP autocomplete
-- MinIO workspace persistence
-
----
-
-## Deployment
-
-For deploying to a real Kubernetes cluster (Phase 3+), see [`docs/DEPLOY.md`](docs/DEPLOY.md).
-
-Current production deployment lives on a GCP VM (`asia-south1`, e2-standard-2)
-behind public IP `34.47.224.18`. Docker Compose stack restarts automatically
-on VM reboot.
 
 ---
 
 ## License
 
-Research project — license TBD before final submission.
+Research project. License to be finalized before public release.

@@ -4,6 +4,14 @@ docs/ASCII_LOGO.md
 docs/EVAL_*.md
 docs-private/
 notes-*.md
+# Developer docs kept local — the public repo stays product-facing (README + assets only)
+docs/API.md
+docs/ARCHITECTURE.md
+docs/DEPLOY.md
+docs/DEVELOPMENT.md
+docs/ML.md
+docs/USER-WALKTHROUGH.md
+docs/diagrams/
 
 # Research paper PDFs — too big for git, fetched manually via docs/research/papers/README.md
 docs/research/papers/*.pdf
@@ -133,3 +141,29 @@ docs/PRESENTATION-SCRIPT.md
 docs/ARCHITECTURE-DIAGRAMS.md
 docs/OAUTH-SETUP.md
 docs/TECH-STACK-STATUS.md
+
+# Personal/working docs — keep local, never commit
+changesmade.md
+docs/DATASETS.md
+docs/MEETING-GUIDE-2026-06-19.md
+docs/REAL-DATASETS-PLAN.md
+docs/RUN-IT-YOURSELF.md
+ml/scheduler/pfmppo/TRAINING.md
+
+# Personal make-it-real / viva prep — keep local, never commit
+docs-private/
+
+# Committed model artifacts: trained on real datasets, small (weights + metrics +
+# provenance only). These override the *.pt/*.joblib/*.onnx ignores above. NEVER put
+# raw datasets here — only the tiny trained outputs.
+!ml/**/artifacts/
+!ml/**/artifacts/**
+
+# Internal research + status docs (kept local, not public)
+docs/research/
+docs/TECH-STACK-STATUS.md
+
+# Developer/internal docs + diagram sources (kept local, repo stays product-facing)
+docs/diagrams/
+docs/LEARNING_AND_TASKS.md
+docs/TEAM_GUIDE.md
