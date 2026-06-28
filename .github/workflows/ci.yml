@@ -39,8 +39,8 @@ jobs:
         run: python -m unittest ml.risk_scorer.test_scorer -v
       - name: Scheduler env tests
         run: python -m unittest ml.scheduler.test_env -v
-      - name: Prewarming dataset tests
-        run: python -m unittest ml.prewarming.test_dataset -v
+      - name: Prewarming policy tests
+        run: python -m unittest ml.prewarming.test_policy -v
 
   # ── Frontend (Next.js + TypeScript) ───────────────────────────────────────
   frontend:
