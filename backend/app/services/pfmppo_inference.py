@@ -94,8 +94,12 @@ class PFMPPOInferenceService:
             return
 
         path = Path(model_path)
+        if not path.is_absolute():
+            # Resolve repo-relative paths (e.g. "ml/scheduler/pfmppo/artifacts/model.pt")
+            # against the repo root so it works regardless of the backend's CWD.
+            path = Path(__file__).resolve().parents[3] / path
         if not path.exists():
-            logger.error("PF-MPPO model not found: %s", path)
+            logger.info("PF-MPPO model not found (%s); using heuristic fallback", path)
             return
 
         try:

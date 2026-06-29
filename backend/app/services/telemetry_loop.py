@@ -57,7 +57,10 @@ async def telemetry_main_loop() -> None:
 
         try:
             if t - last_drift > TICK_TELEMETRY_S:
-                cluster_state.tick_telemetry()
+                # On a real cluster (ASTRA_USE_K8S_METRICS=1) read live node metrics;
+                # otherwise drift the in-memory simulator.
+                if not (cluster_state._use_k8s() and cluster_state.refresh_from_kubernetes()):
+                    cluster_state.tick_telemetry()
                 last_drift = t
 
             if t - last_event > TICK_EVENT_EMIT_S:

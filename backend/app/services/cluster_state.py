@@ -14,10 +14,14 @@ in-memory cache populated from the actual gRPC telemetry daemon.
 """
 from __future__ import annotations
 
+import logging
+import os
 import random
 import threading
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -161,6 +165,93 @@ def tick_telemetry() -> None:
 
 def clip(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
+
+
+# ── Real Kubernetes metrics reader (gated; replaces the simulator on-cluster) ──
+# Enable by setting ASTRA_USE_K8S_METRICS=1 in a cluster with metrics-server.
+# When active, telemetry_loop calls refresh_from_kubernetes() instead of the
+# random-drift tick_telemetry(). Falls back to the simulator on any error, so the
+# single-VM demo is unaffected until a real cluster is present.
+
+def _use_k8s() -> bool:
+    return os.getenv("ASTRA_USE_K8S_METRICS") == "1"
+
+
+def _parse_cpu(q: str) -> float:
+    """Kubernetes CPU quantity -> cores. Handles n (nano), u (micro), m (milli)."""
+    q = str(q)
+    if q.endswith("n"):
+        return float(q[:-1]) / 1e9
+    if q.endswith("u"):
+        return float(q[:-1]) / 1e6
+    if q.endswith("m"):
+        return float(q[:-1]) / 1e3
+    return float(q)
+
+
+def _parse_mem(q: str) -> float:
+    """Kubernetes memory quantity -> MiB."""
+    q = str(q)
+    units = {"Ki": 1 / 1024, "Mi": 1.0, "Gi": 1024.0, "Ti": 1024 * 1024}
+    for suf, mul in units.items():
+        if q.endswith(suf):
+            return float(q[:-len(suf)]) * mul
+    return float(q) / (1024 * 1024)   # bare bytes
+
+
+def refresh_from_kubernetes() -> bool:
+    """Rebuild the store from live node capacity (CoreV1) + usage (metrics.k8s.io).
+    Returns True if it refreshed real data, False to fall back to the simulator."""
+    try:
+        from kubernetes import client, config
+    except ImportError:
+        return False
+    try:
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+        core = client.CoreV1Api()
+        custom = client.CustomObjectsApi()
+        nodes = core.list_node().items
+        usage = {i["metadata"]["name"]: i["usage"] for i in
+                 custom.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")["items"]}
+    except Exception as e:
+        logger.warning("k8s metrics read failed, using simulator: %s", e)
+        return False
+
+    zone = os.getenv("ASTRA_CLUSTER_ZONE", "IN-NO")
+    new_nodes: Dict[str, Node] = {}
+    for n in nodes:
+        name = n.metadata.name
+        alloc = n.status.allocatable or {}
+        cpu_cap = _parse_cpu(alloc.get("cpu", "1"))
+        mem_cap = _parse_mem(alloc.get("memory", "1024Mi"))
+        u = usage.get(name, {})
+        cpu_used = _parse_cpu(u.get("cpu", "0"))
+        mem_used = _parse_mem(u.get("memory", "0"))
+        # sandbox tiers available per node label (runc always; runsc/kata if labelled)
+        labels = n.metadata.labels or {}
+        tiers = ["runc"]
+        if labels.get("sandbox.astra-ide.io/gvisor") == "true":
+            tiers.append("gvisor")
+        if labels.get("sandbox.astra-ide.io/firecracker") == "true":
+            tiers.append("firecracker")
+        new_nodes[name] = Node(
+            cluster_id="cluster-local", name=name,
+            cpu_util=clip(cpu_used / cpu_cap if cpu_cap else 0.0, 0.0, 1.0),
+            memory_util=clip(mem_used / mem_cap if mem_cap else 0.0, 0.0, 1.0),
+            sandboxes=tiers, cpu_cap=cpu_cap, mem_cap=mem_cap,
+        )
+    if not new_nodes:
+        return False
+    with _lock:
+        carbon = _CLUSTERS.get("cluster-local").carbon_gco2 if "cluster-local" in _CLUSTERS else 500.0
+        _CLUSTERS.clear()
+        _CLUSTERS["cluster-local"] = Cluster(
+            id="cluster-local", location=os.getenv("ASTRA_CLUSTER_LOCATION", "on-cluster"),
+            zone=zone, nodes=new_nodes, carbon_gco2=carbon)
+    return True
 
 
 # ── Snapshot for the /metrics API ────────────────────────────────────────────

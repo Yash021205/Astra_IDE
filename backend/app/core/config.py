@@ -59,8 +59,11 @@ class Settings(BaseSettings):
     electricity_maps_url:   str = "https://api.electricitymap.org/v3"
 
     # ── PF-MPPO Scheduler ────────────────────────────────────────────────────
-    scheduler_algorithm: str = "heuristic"       # "heuristic" | "pfmppo"
-    pfmppo_model_path: str = ""                  # path to trained .pt model file
+    # Default to the trained DRL policy; if the model file is absent/unloadable the
+    # inference service returns None and scheduler_service falls back to the
+    # heuristic automatically — so this is safe even before the artifact is committed.
+    scheduler_algorithm: str = "pfmppo"          # "heuristic" | "pfmppo"
+    pfmppo_model_path: str = "ml/scheduler/pfmppo/artifacts/model.pt"  # repo-relative ok
     pfmppo_rule_library_dir: str = ""            # path to rule library directory
     pfmppo_k_pairs: int = 10                     # K parameter (top-K task-VM pairs)
 
