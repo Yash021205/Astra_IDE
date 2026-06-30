@@ -12,7 +12,33 @@
 
 const http = require('http');
 const WebSocket = require('ws');
-const { setupWSConnection } = require('y-websocket/bin/utils');
+const { setupWSConnection, setPersistence } = require('y-websocket/bin/utils');
+
+// Optional durable persistence (B7). When YPERSISTENCE_DIR is set, each room's Yjs
+// document is kept on disk (LevelDB) so it survives collab-server restarts (point it
+// at a mounted volume / PVC in production). Fully guarded: if the flag is unset or
+// y-leveldb is not installed, the server runs in memory exactly as before.
+if (process.env.YPERSISTENCE_DIR) {
+  try {
+    const Y = require('yjs');
+    const { LeveldbPersistence } = require('y-leveldb');
+    const ldb = new LeveldbPersistence(process.env.YPERSISTENCE_DIR);
+    setPersistence({
+      provider: ldb,
+      bindState: async (docName, ydoc) => {
+        const persisted = await ldb.getYDoc(docName);
+        const current = Y.encodeStateAsUpdate(ydoc);
+        await ldb.storeUpdate(docName, current);
+        Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(persisted));
+        ydoc.on('update', (update) => { ldb.storeUpdate(docName, update); });
+      },
+      writeState: async () => {},
+    });
+    console.log(`[persistence] LevelDB enabled at ${process.env.YPERSISTENCE_DIR}`);
+  } catch (e) {
+    console.warn('[persistence] disabled (run npm install to add y-leveldb):', e.message);
+  }
+}
 
 const PORT            = parseInt(process.env.PORT || '1234', 10);
 const HOST            = process.env.HOST || '0.0.0.0';
