@@ -12,7 +12,7 @@ import unittest
 
 from ml.anomaly_ids.embedding import (
     generate_anonymous_walks, anonymous_walk_embedding, build_syscall_graph,
-    EMBED_DIM,
+    rich_embedding, rich_embed_dim, graph_stats, EMBED_DIM,
 )
 from ml.anomaly_ids.detector import ContainerIDS, Decision
 
@@ -46,6 +46,28 @@ class TestAnonymousWalkMath(unittest.TestCase):
         self.assertEqual(g[1][2], 2)   # bigram (1->2) occurs twice
         self.assertEqual(g[2][1], 1)
         self.assertEqual(g[2][3], 1)
+
+    def test_embedding_length_is_generalized(self):
+        # Regression: passing length != 4 must give a Bell(length)-dim distribution,
+        # not silently fall back to the length-4 vocabulary (all-zeros bug).
+        seq = [1, 2, 3, 2, 1, 4, 5, 4, 2, 3, 1, 2, 3, 4, 5, 1, 2, 1, 3, 2]
+        self.assertEqual(len(anonymous_walk_embedding(seq, length=3, n_walks=300, seed=0)), 5)
+        self.assertEqual(len(anonymous_walk_embedding(seq, length=5, n_walks=300, seed=0)), 52)
+        v5 = anonymous_walk_embedding(seq, length=5, n_walks=300, seed=0)
+        self.assertAlmostEqual(sum(v5), 1.0, places=6)   # a real distribution, not zeros
+
+    def test_graph_stats_fixed_size_bounded(self):
+        s = graph_stats([1, 2, 3, 2, 1, 4, 5, 4, 2, 3, 1, 2])
+        self.assertEqual(len(s), 8)
+        self.assertTrue(all(0.0 <= x <= 1.0 for x in s))
+
+    def test_rich_embedding_dim_and_deterministic(self):
+        seq = [1, 2, 3, 2, 1, 4, 5, 4, 2, 3, 1, 2, 3, 4, 5, 1, 2, 1, 3, 2]
+        a = rich_embedding(seq, n_walks=200, seed=3)
+        b = rich_embedding(seq, n_walks=200, seed=3)
+        self.assertEqual(len(a), rich_embed_dim())       # 72 walks + 8 stats + 32 freq = 112
+        self.assertEqual(len(a), 112)
+        self.assertEqual(a, b)                            # deterministic given seed
 
 
 # ── Synthetic syscall workloads for the pipeline test ─────────────────────────
@@ -123,6 +145,41 @@ class TestIDSPipeline(unittest.TestCase):
         t = _structured_trace([1, 2, 3], 60, noise=0.02, rng=rng)
         res = self.ids.predict(anonymous_walk_embedding(t, seed=11))
         self.assertEqual(res.rf_class, "data_analytics")
+
+
+class TestIDSPersistence(unittest.TestCase):
+    """A fitted detector saved to disk and reloaded predicts identically — this is
+    the artifact path (train offline on real data → commit ids.joblib → serve)."""
+
+    def test_save_load_round_trip(self):
+        import tempfile, os
+        rng = random.Random(7)
+        cyc = {"a": [1, 2, 3], "b": [4, 5, 6, 7]}
+        by_class = {
+            name: _embed_many([_structured_trace(c, 60, 0.05, rng) for _ in range(20)],
+                              seed0=100 + i * 100)
+            for i, (name, c) in enumerate(cyc.items())
+        }
+        ids = ContainerIDS(seed=42).fit(by_class)
+        sample = anonymous_walk_embedding(_structured_trace([1, 2, 3], 60, 0.02, rng), seed=11)
+        before = ids.predict(sample)
+
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "ids.joblib")
+            ids.save(path)
+            self.assertTrue(os.path.exists(path))
+            loaded = ContainerIDS.load(path)
+
+        after = loaded.predict(sample)
+        self.assertEqual(loaded.classes_, ids.classes_)
+        self.assertEqual(after.decision, before.decision)
+        self.assertEqual(after.rf_class, before.rf_class)
+
+    def test_save_before_fit_raises(self):
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(RuntimeError):
+                ContainerIDS(seed=1).save(os.path.join(d, "x.joblib"))
 
 
 if __name__ == "__main__":

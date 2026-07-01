@@ -1,0 +1,58 @@
+{
+  "dataset": "LID-DS-2021",
+  "scenarios": [
+    "Bruteforce_CWE-307",
+    "CVE-2012-2122",
+    "CVE-2014-0160"
+  ],
+  "vocab_size": 56,
+  "embedding": {
+    "kind": "rich-multiscale-graph",
+    "walk_lengths": [
+      3,
+      4,
+      5
+    ],
+    "dim": 80,
+    "walks": 120,
+    "window": 350
+  },
+  "astra_ids": {
+    "f1": 0.8159,
+    "precision": 0.9471,
+    "recall": 0.7167,
+    "fpr": 0.04,
+    "threshold": 0.0073,
+    "roc_auc": 0.8745
+  },
+  "baselines": {
+    "stide": {
+      "f1": 0.7491,
+      "precision": 0.824,
+      "recall": 0.6867,
+      "fpr": 0.1467,
+      "threshold": 0.0665,
+      "roc_auc": 0.8184
+    },
+    "frequency_iforest": {
+      "f1": 0.7257,
+      "precision": 0.635,
+      "recall": 0.8467,
+      "fpr": 0.4867,
+      "threshold": -0.1184,
+      "roc_auc": 0.7014
+    }
+  },
+  "astra_vs_best_baseline_f1_gain": 0.0668,
+  "paper_reference": {
+    "source": "Iacovazzi & Raza, IEEE CSR 2022",
+    "f1_range": [
+      0.78,
+      0.99
+    ],
+    "fpr_range": [
+      0.024,
+      0.071
+    ]
+  }
+}

@@ -137,3 +137,37 @@ class ContainerIDS:
         if len(inliers) == 1:
             return IDSResult(Decision.NORMAL, inliers[0], scores, rf_class)
         return IDSResult(Decision.ANOMALY, None, scores, rf_class)
+
+    # ── Persistence (train-offline → commit artifact → serve) ──────────────────
+    def save(self, path) -> None:
+        """Persist the fitted detector (RF + per-class IFs + metadata) so it can be
+        committed as an artifact and loaded live. `embed_config` (how the input
+        vectors were produced, e.g. {"kind":"rich","lengths":[3,4,5],"walks":120})
+        is stored so a live loop embeds syscalls identically. Raises if not fitted."""
+        import joblib
+        if self._rf is None:
+            raise RuntimeError("nothing to save; call fit() first")
+        joblib.dump({
+            "classes_":      self.classes_,
+            "rf":            self._rf,
+            "ifs":           self._ifs,
+            "thresholds":    self._thresholds,
+            "n_estimators":  self.n_estimators,
+            "contamination": self.contamination,
+            "seed":          self.seed,
+            "embed_config":  getattr(self, "embed_config", None),
+        }, path)
+
+    @classmethod
+    def load(cls, path) -> "ContainerIDS":
+        """Load a detector saved by save(); returns a ready-to-predict instance."""
+        import joblib
+        blob = joblib.load(path)
+        ids = cls(n_estimators=blob["n_estimators"],
+                  contamination=blob["contamination"], seed=blob["seed"])
+        ids.classes_    = blob["classes_"]
+        ids._rf         = blob["rf"]
+        ids._ifs        = blob["ifs"]
+        ids._thresholds = blob["thresholds"]
+        ids.embed_config = blob.get("embed_config")
+        return ids
