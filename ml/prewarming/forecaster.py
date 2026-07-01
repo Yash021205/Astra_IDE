@@ -164,3 +164,30 @@ class InvocationForecaster:
         yhat = self.walk_forward(s)
         n = min(len(y), len(yhat))
         return all_metrics(y[:n], yhat[:n])
+
+    # ── Persistence (train-offline → commit artifact → serve) ──────────────────
+    def save(self, path) -> None:
+        """Persist the trained LSTM (+ z-score stats + config) so it can be
+        committed as an artifact and loaded live. Raises if not yet fit."""
+        if self._model is None:
+            raise RuntimeError("nothing to save; call fit() first")
+        torch.save({
+            "state_dict": self._model.state_dict(),
+            "mu":         self._mu,
+            "sd":         self._sd,
+            "config":     {"input_len": self.input_len, "hidden": self.hidden,
+                           "layers": self.layers, "horizon": self.horizon},
+        }, path)
+
+    @classmethod
+    def load(cls, path) -> "InvocationForecaster":
+        """Load a forecaster saved by save(); returns a ready-to-predict instance."""
+        blob = torch.load(path, map_location="cpu", weights_only=False)
+        cfg = blob["config"]
+        f = cls(input_len=cfg["input_len"], hidden=cfg["hidden"],
+                layers=cfg["layers"], horizon=cfg["horizon"])
+        f._mu, f._sd = blob["mu"], blob["sd"]
+        f._model = _LSTM(f.hidden, f.layers, f.horizon)
+        f._model.load_state_dict(blob["state_dict"])
+        f._model.eval()
+        return f

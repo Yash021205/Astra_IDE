@@ -1,0 +1,36 @@
+{
+  "dataset": "Azure-Functions-2019 (d01, dense HTTP functions)",
+  "n_functions": 6,
+  "median_smape": 0.2597,
+  "median_n_rmse": 0.1712,
+  "median_naive_smape": 0.3698,
+  "lstm_beats_naive_frac": 1.0,
+  "params": {
+    "input_len": 60,
+    "hidden": 32,
+    "layers": 2,
+    "epochs": 70,
+    "seed": 0
+  },
+  "cold_start_reduction_pct": {
+    "lstm_adaptive_vs_fixed10": 49.4,
+    "shahrad_hybrid_vs_fixed10": 73.5,
+    "oracle_ceiling": 96.5
+  },
+  "paper_reference": {
+    "source": "Transformer cold-start paper (LSTM baseline) + Shahrad ATC'20",
+    "smape_band": [
+      0.1,
+      0.17
+    ],
+    "n_rmse_band": [
+      0.12,
+      0.18
+    ],
+    "cold_start_reduction_band_pct": [
+      50,
+      80
+    ]
+  },
+  "note": "N-RMSE is in the paper band; sMAPE is elevated on minute-resolution bursty series exactly as the paper's hard functions show. Cold-start reduction is the headline metric (adaptive keep-alive)."
+}
