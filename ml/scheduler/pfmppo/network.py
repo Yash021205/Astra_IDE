@@ -1,8 +1,11 @@
 """
-PF-MPPO Neural Network architecture (paper Table 1).
+PF-MPPO Actor-Critic network (paper Table 1 / Table 2).
 
-5-hidden-layer shared network with separate Actor (Softmax) and Critic (value) heads.
-Architecture: Input(100) -> 32 -> 64 -> 32 -> 16 -> [Actor: K, Critic: 1]
+Shared MLP backbone with 5 hidden layers (paper Table 2: "Number of hidden layers
+= 5"), then separate Actor (Softmax over K pairs) and Critic (state value) heads.
+Architecture: Input(100) -> 64 -> 64 -> 32 -> 32 -> 16 -> [Actor: K, Critic: 1]
+The paper states both Actor and Critic are seven-layer fully connected networks:
+one input layer, five hidden layers, and one output layer.
 """
 from __future__ import annotations
 
@@ -24,12 +27,15 @@ class PFMPPONetwork(nn.Module):
         self.input_dim = input_dim
         self.k_pairs = k_pairs
 
+        # 5 hidden layers (paper Table 2), input + 5 hidden + output head = 7 layers.
         self.shared = nn.Sequential(
-            nn.Linear(input_dim, 32),
+            nn.Linear(input_dim, 64),
             nn.ReLU(),
-            nn.Linear(32, 64),
+            nn.Linear(64, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
             nn.ReLU(),
             nn.Linear(32, 16),
             nn.ReLU(),

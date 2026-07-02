@@ -35,6 +35,8 @@ class TestTrainingConvergence(unittest.TestCase):
             "seed": 42,
         }
 
+        import torch
+        torch.manual_seed(0)
         trainer = CTDETrainer(
             num_workers=2,
             env_config=env_config,
@@ -45,7 +47,7 @@ class TestTrainingConvergence(unittest.TestCase):
             epsilon=0.2,
         )
 
-        metrics = trainer.train(iterations=300, log_interval=500)
+        metrics = trainer.train(iterations=500, log_interval=500)
 
         # Compare first 30 vs last 30 mean rewards
         early_rewards = metrics["mean_reward"][:30]
@@ -54,7 +56,7 @@ class TestTrainingConvergence(unittest.TestCase):
         early_mean = np.mean(early_rewards)
         late_mean = np.mean(late_rewards)
 
-        # With 300 iterations, the agent should show clear improvement
+        # Training should improve reward (seeded for reproducibility).
         self.assertGreater(late_mean, early_mean)
 
 
@@ -74,6 +76,8 @@ class TestTemplateTrainingConvergence(unittest.TestCase):
             "num_workspaces": (2, 4),
         }
 
+        import torch
+        torch.manual_seed(0)
         trainer = CTDETrainer(
             num_workers=2,
             env_config=env_config,
@@ -84,7 +88,7 @@ class TestTemplateTrainingConvergence(unittest.TestCase):
             epsilon=0.2,
         )
 
-        metrics = trainer.train(iterations=300, log_interval=500)
+        metrics = trainer.train(iterations=500, log_interval=500)
 
         early_rewards = metrics["mean_reward"][:30]
         late_rewards = metrics["mean_reward"][-30:]

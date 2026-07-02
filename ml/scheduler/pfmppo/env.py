@@ -94,9 +94,9 @@ if _GYM_AVAILABLE:
             max_deps_per_task: int = 3,
             vm_configs: Optional[List[Dict]] = None,
             seed: Optional[int] = None,
-            alpha1: float = 0.60,
-            alpha2: float = 0.20,
-            alpha3: float = 0.20,
+            alpha1: float = 0.34,   # paper Table 2: latency weight (0.34 = 1 - 0.33 - 0.33)
+            alpha2: float = 0.33,   # paper Table 2: energy weight
+            alpha3: float = 0.33,   # paper Table 2: load-balance weight
             dag_mode: str = "random",
             num_workspaces: Tuple[int, int] = (3, 8),
             language_weights: Optional[Dict[str, float]] = None,
@@ -164,12 +164,14 @@ if _GYM_AVAILABLE:
 
             if use_trace:
                 if self.trace_dataset is None:
-                    from ml.scheduler.pfmppo.google_trace_loader import GoogleTraceDataset
-                    self.trace_dataset = GoogleTraceDataset(
+                    # Shared, process-wide cache: all CTDE worker threads reuse ONE
+                    # parse instead of each re-parsing the multi-GB trace.
+                    from ml.scheduler.pfmppo.google_trace_loader import load_cached
+                    self.trace_dataset = load_cached(
                         data_dir=self.data_dir,
                         max_tasks_per_episode=self.num_tasks,
                         max_files=self.max_files,   # 0 = load the FULL trace
-                    ).load()
+                    )
                 self.dag, self.vms = self.trace_dataset.sample_episode(
                     rng=np.random.default_rng(int(dag_seed)),
                     vm_configs=self.vm_configs,

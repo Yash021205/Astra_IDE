@@ -73,14 +73,15 @@ class TestPFMPPONetwork(unittest.TestCase):
 
     def test_parameter_count(self):
         total_params = sum(p.numel() for p in self.network.parameters())
-        # Input(100) -> 32: 100*32+32 = 3232
-        # 32 -> 64: 32*64+64 = 2112
+        # 5 hidden layers (paper Table 2):
+        # Input(100) -> 64: 100*64+64 = 6464
+        # 64 -> 64: 64*64+64 = 4160
         # 64 -> 32: 64*32+32 = 2080
+        # 32 -> 32: 32*32+32 = 1056
         # 32 -> 16: 32*16+16 = 528
-        # Actor: 16*10+10 = 170
-        # Critic: 16*1+1 = 17
-        # Total: 8139
-        self.assertEqual(total_params, 8139)
+        # Actor: 16*10+10 = 170 ; Critic: 16*1+1 = 17
+        # Total: 14475
+        self.assertEqual(total_params, 14475)
 
     def test_no_mask_works(self):
         state = torch.randn(2, 100)

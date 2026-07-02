@@ -172,8 +172,10 @@ class CTDETrainer:
 
         Returns training metrics history.
         """
+        import time
         steps_per_worker = max(1, self.batch_size // self.num_workers)
         metrics_history = {"actor_loss": [], "critic_loss": [], "entropy": [], "mean_reward": []}
+        t_start = time.time()
 
         for iteration in range(1, iterations + 1):
             # Broadcast current weights
@@ -204,13 +206,21 @@ class CTDETrainer:
 
             self.training_history.append(metrics)
 
-            if iteration % log_interval == 0:
+            # Progress: log the first few iterations (so the run is visibly alive
+            # within seconds), then every `log_interval`, always with an ETA. flush
+            # so it streams in notebooks/CI where stdout is block-buffered.
+            if iteration <= 5 or iteration % log_interval == 0 or iteration == iterations:
+                elapsed = time.time() - t_start
+                per_it = elapsed / iteration
+                eta_s = per_it * (iterations - iteration)
                 print(
                     f"[Iter {iteration}/{iterations}] "
+                    f"reward={mean_reward:.4f} "
                     f"actor_loss={metrics['actor_loss']:.4f} "
                     f"critic_loss={metrics['critic_loss']:.4f} "
                     f"entropy={metrics['entropy']:.4f} "
-                    f"mean_reward={mean_reward:.4f}"
+                    f"| {per_it:.2f}s/it  ETA {eta_s/60:.1f} min",
+                    flush=True,
                 )
 
         return metrics_history

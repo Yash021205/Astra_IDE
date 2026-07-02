@@ -312,7 +312,7 @@ Set `SCHEDULER_ALGORITHM=heuristic` (or remove it — heuristic is the default) 
 | Workers | 9 | `--workers 9` |
 | Iterations | 2000 | `--iterations 2000` |
 | K (top pairs) | 10 | `--k-pairs 10` |
-| Reward weights | α₁=0.60, α₂=0.20, α₃=0.20 | Set in env.py |
+| Reward weights | α₁=0.34, α₂=0.33, α₃=0.33 (paper Table 2) | Set in env.py |
 | DAG mode | hybrid | `--dag-mode hybrid` |
 | Workspaces per episode | 3–8 | `--num-workspaces-min 3 --num-workspaces-max 8` |
 | Template ratio (hybrid) | 0.7 | `--template-ratio 0.7` |

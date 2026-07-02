@@ -108,11 +108,11 @@ class GoogleTraceDataset:
 
     def load(self) -> "GoogleTraceDataset":
         """Parse trace files and build indexed structures."""
-        print(f"Loading Google Cluster Trace from {self.data_dir} (max_files={self.max_files})...")
+        print(f"Loading Google Cluster Trace from {self.data_dir} (max_files={self.max_files})...", flush=True)
         self._load_machines()
-        print(f"  Loaded {len(self.machines)} machines")
+        print(f"  Loaded {len(self.machines)} machines", flush=True)
         self._load_tasks()
-        print(f"  Loaded {len(self.jobs)} jobs ({sum(len(j.tasks) for j in self.jobs)} tasks)")
+        print(f"  Loaded {len(self.jobs)} jobs ({sum(len(j.tasks) for j in self.jobs)} tasks)", flush=True)
         self._loaded = True
         return self
 
@@ -169,8 +169,7 @@ class GoogleTraceDataset:
         task_events: Dict[Tuple[str, int], List[dict]] = defaultdict(list)
 
         for fi, fpath in enumerate(files):
-            if (fi + 1) % 5 == 0 or fi == 0:
-                print(f"  Parsing task_events file {fi+1}/{len(files)}...")
+            print(f"  Parsing task_events file {fi+1}/{len(files)}...", flush=True)
             with gzip.open(fpath, "rt") as f:
                 for line in f:
                     parts = line.strip().split(",")
@@ -441,3 +440,37 @@ def generate_trace_dag(
 ) -> Tuple[TaskDAG, List[VM]]:
     """Top-level generator matching the interface of generate_random_dag."""
     return dataset.sample_episode(rng=rng, vm_configs=vm_configs)
+
+
+# ── Process-wide shared cache ────────────────────────────────────────────────
+# CTDE training runs N worker envs as THREADS in one process. Without this each
+# worker would parse the multi-GB trace independently (Nx the cost + looks frozen).
+# Caching keyed by (data_dir, max_files, max_tasks) means all workers share ONE
+# parse. The loaded dataset is read-only after load(), so concurrent sampling
+# (each worker passes its own rng) is safe.
+import threading  # noqa: E402
+
+_CACHE: Dict[tuple, "GoogleTraceDataset"] = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def load_cached(
+    data_dir: str,
+    max_tasks_per_episode: int = 50,
+    max_files: int = 10,
+    **kwargs,
+) -> "GoogleTraceDataset":
+    """Load the trace once per (data_dir, max_files, max_tasks) and reuse it across
+    all worker threads. Thread-safe; the first caller parses, the rest wait + reuse."""
+    key = (str(data_dir), int(max_files), int(max_tasks_per_episode))
+    with _CACHE_LOCK:
+        ds = _CACHE.get(key)
+        if ds is None:
+            ds = GoogleTraceDataset(
+                data_dir=data_dir,
+                max_tasks_per_episode=max_tasks_per_episode,
+                max_files=max_files,
+                **kwargs,
+            ).load()
+            _CACHE[key] = ds
+        return ds
