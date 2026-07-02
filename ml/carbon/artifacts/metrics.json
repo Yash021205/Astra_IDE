@@ -1,0 +1,24 @@
+{
+  "dataset": "UK Carbon Intensity API (GB grid, actual gCO2/kWh, half-hourly)",
+  "trace_points": 674,
+  "days": 14,
+  "gco2_min": 37.0,
+  "gco2_max": 256.0,
+  "gco2_mean": 141.1,
+  "slack_steps": 12,
+  "carbon_agnostic_g": 7422.9,
+  "carbon_aware_g": 6113.5,
+  "carbon_reduction_pct": 17.64,
+  "mean_delay_steps": 6.05,
+  "reduction_vs_slack": {
+    "2": 2.73,
+    "6": 9.13,
+    "12": 17.64,
+    "24": 29.73,
+    "48": 40.74
+  },
+  "paper_reference": {
+    "source": "PCAPS (Lechowicz et al.)",
+    "up_to_pct": 32.9
+  }
+}
