@@ -41,6 +41,11 @@ def evaluate_agent(agent: PPOAgent, env_config: dict, episodes: int, determinist
         steps = 0
 
         for _ in range(env_config["max_steps"]):
+            # Fairness: the Random/Greedy baselines below stop when no action is
+            # valid (a task is waiting on unfinished dependencies). PF-MPPO must do
+            # the same, else it alone eats the invalid-action penalty for "waiting".
+            if not np.any(mask > 0):
+                break
             action, _, _ = agent.select_action(obs, mask, deterministic=deterministic)
             obs, reward, terminated, truncated, info = env.step(action)
             mask = info["valid_mask"]
@@ -123,6 +128,15 @@ def main():
     parser.add_argument("--num-tasks", type=int, default=15)
     parser.add_argument("--num-vms", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=200)
+    parser.add_argument("--model-path", type=str, default=None,
+                        help="evaluate this trained model instead of training a fresh one")
+    parser.add_argument("--dag-mode", type=str, default="random",
+                        help="workload distribution for eval (random|template|hybrid|trace_hybrid)")
+    parser.add_argument("--data-dir", type=str, default=None,
+                        help="Google-trace dir (required for trace/trace_hybrid eval)")
+    parser.add_argument("--max-files", type=int, default=0)
+    parser.add_argument("--metrics-out", type=str, default=None,
+                        help="append the PPO-vs-baselines table to this metrics.json")
     args = parser.parse_args()
 
     env_config = {
@@ -132,6 +146,9 @@ def main():
         "max_steps": 100,
         "max_deps_per_task": 3,
         "seed": 42,
+        "dag_mode": args.dag_mode,
+        "data_dir": args.data_dir,
+        "max_files": args.max_files,
     }
 
     print("=" * 70)
@@ -143,27 +160,35 @@ def main():
     print(f"  Eval:      {args.eval_episodes} episodes")
     print()
 
-    # Train PF-MPPO
-    print("[1/4] Training PF-MPPO agent...")
-    t0 = time.time()
-    trainer = CTDETrainer(
-        num_workers=args.workers,
-        env_config=env_config,
-        k_pairs=10,
-        lr=0.001,
-        batch_size=args.batch_size,
-        gamma=0.9,
-        epsilon=0.2,
-    )
-    metrics = trainer.train(iterations=args.train_iterations, log_interval=args.train_iterations // 4)
-    train_time = time.time() - t0
-    print(f"    Training time: {train_time:.1f}s")
-    print(f"    Final mean reward: {metrics['mean_reward'][-1]:.4f}")
+    # Load a committed model, or train a fresh one.
+    train_time = 0.0
+    if args.model_path:
+        print(f"[1/4] Loading trained PF-MPPO model: {args.model_path}")
+        network = PFMPPONetwork(input_dim=10 * 10, k_pairs=10)
+        agent = PPOAgent(network=network, lr=0.001, gamma=0.9, epsilon=0.2)
+        agent.load(args.model_path)
+    else:
+        print("[1/4] Training PF-MPPO agent...")
+        t0 = time.time()
+        trainer = CTDETrainer(
+            num_workers=args.workers,
+            env_config=env_config,
+            k_pairs=10,
+            lr=0.001,
+            batch_size=args.batch_size,
+            gamma=0.9,
+            epsilon=0.2,
+        )
+        metrics = trainer.train(iterations=args.train_iterations, log_interval=args.train_iterations // 4)
+        train_time = time.time() - t0
+        print(f"    Training time: {train_time:.1f}s")
+        print(f"    Final mean reward: {metrics['mean_reward'][-1]:.4f}")
+        agent = trainer.get_agent()
     print()
 
     # Evaluate all algorithms
     print("[2/4] Evaluating PF-MPPO (deterministic)...")
-    pfmppo_results = evaluate_agent(trainer.get_agent(), env_config, args.eval_episodes)
+    pfmppo_results = evaluate_agent(agent, env_config, args.eval_episodes)
 
     print("[3/4] Evaluating baselines...")
     random_results = evaluate_random(env_config, args.eval_episodes)
@@ -215,6 +240,30 @@ def main():
     with open(out_dir / "pfmppo_benchmark.json", "w") as f:
         json.dump(results, f, indent=2, default=convert)
     print(f"\nResults saved to {out_dir / 'pfmppo_benchmark.json'}")
+
+    # Merge the real PPO-vs-baselines table into the served artifact metrics.
+    if args.metrics_out:
+        mp = Path(args.metrics_out)
+        base = {}
+        if mp.exists():
+            try:
+                base = json.loads(mp.read_text())
+            except ValueError:
+                base = {}
+        base["eval"] = {
+            "dag_mode": args.dag_mode,
+            "eval_episodes": args.eval_episodes,
+            "mean_reward": {
+                "pfmppo": round(float(pfmppo_results["mean_reward"]), 3),
+                "greedy_priority": round(float(greedy_results["mean_reward"]), 3),
+                "random": round(float(random_results["mean_reward"]), 3),
+            },
+            "pfmppo_invalid_action_rate": round(float(pfmppo_results["invalid_action_rate"]), 4),
+            "note": "higher reward is better (reward = -cost); PF-MPPO vs env baselines",
+        }
+        mp.parent.mkdir(parents=True, exist_ok=True)
+        mp.write_text(json.dumps(base, indent=2))
+        print(f"merged eval table -> {mp}")
 
 
 if __name__ == "__main__":
