@@ -1,5 +1,6 @@
 'use client';
 import Sidebar from './Sidebar';
+import Walkthrough from './Walkthrough';
 
 export { Avatar } from './AvatarInline';
 
@@ -10,6 +11,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="ambient" aria-hidden="true" />
       <Sidebar />
       <main id="main" className="flex-1 min-w-0">{children}</main>
+      <Walkthrough />
     </div>
   );
 }

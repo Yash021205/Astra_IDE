@@ -10,7 +10,8 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Boxes, BarChart3, LayoutGrid as PlatformIcon, Activity, Container,
-  PanelLeftClose, PanelLeftOpen, Camera, LogOut, User, Loader2, Shield, Github,
+  PanelLeftClose, PanelLeftOpen, Camera, LogOut, User, Loader2, Shield, Github, FlaskConical,
+  HelpCircle,
 } from 'lucide-react';
 
 import { useAuth } from '../lib/auth';
@@ -27,6 +28,7 @@ const NAV = [
   { href: '/pods',          label: 'Containers',    icon: Container },
   { href: '/clusters',      label: 'Clusters',      icon: Boxes },
   { href: '/benchmarks',    label: 'Benchmarks',    icon: BarChart3 },
+  { href: '/research',      label: 'Research',      icon: FlaskConical },
   { href: '/observability', label: 'Observability', icon: Activity },
   { href: '/platform',      label: 'Platform',      icon: PlatformIcon },
 ];
@@ -164,7 +166,7 @@ export default function Sidebar() {
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-surface" />
                 )}
               </span>
-              {open && <span className="whitespace-nowrap">GitHub</span>}
+              {open && <span className="whitespace-nowrap">GitHub Integration</span>}
             </button>
           );
           return open
@@ -181,11 +183,11 @@ export default function Sidebar() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.18 }}
-            className="fixed z-50 top-0 bottom-0 glass border-r border-edge shadow-pop overflow-hidden flex flex-col"
+            className="fixed z-50 top-0 bottom-0 bg-surface/95 backdrop-blur-2xl border-r border-edge-strong shadow-pop overflow-hidden flex flex-col"
             style={{ left: open ? 240 : 68, width: 300 }}
           >
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-edge shrink-0">
-              <span className="text-xs font-semibold">GitHub</span>
+              <span className="text-xs font-semibold">GitHub Integration</span>
               <button type="button" onClick={() => setGhPanelOpen(false)}
                 className="btn-ghost p-1 text-xs text-muted">✕</button>
             </div>
@@ -196,8 +198,20 @@ export default function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* Bottom: theme + account */}
+      {/* Bottom: tour + theme + account */}
       <div className="border-t border-edge p-2.5 space-y-1">
+        {(() => {
+          const tourBtn = (
+            <button type="button"
+                    onClick={() => window.dispatchEvent(new Event('astra:open-tour'))}
+                    className={cn('w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-muted hover:bg-raised hover:text-ink transition-colors',
+                      !open && 'justify-center')}>
+              <HelpCircle size={18} className="shrink-0" />
+              {open && <span className="whitespace-nowrap">Take the tour</span>}
+            </button>
+          );
+          return open ? tourBtn : <Tooltip content="Take the tour" side="right">{tourBtn}</Tooltip>;
+        })()}
         <div className={cn('flex', open ? 'justify-start' : 'justify-center')}>
           <ThemeToggle />
         </div>

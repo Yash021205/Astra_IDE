@@ -17,6 +17,7 @@ const NAV = [
   { href: '/dashboard',  label: 'Dashboard' },
   { href: '/clusters',   label: 'Clusters' },
   { href: '/benchmarks', label: 'Benchmarks' },
+  { href: '/research',   label: 'Research' },
   { href: '/platform',   label: 'Platform' },
 ];
 
