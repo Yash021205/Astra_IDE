@@ -122,7 +122,7 @@ export default function WorkspacePage() {
   const isOwner = ws.owner_id === user.id;
 
   return (
-    <div className="h-screen flex flex-col bg-bg">
+    <div className="h-screen flex flex-col bg-bg overflow-hidden">
       <header className="border-b border-edge bg-surface px-3 sm:px-4 py-2 flex items-center gap-3 flex-wrap">
         <button type="button" onClick={goBack} aria-label="Back to dashboard" className="btn-ghost px-2"><ArrowLeft size={15} /></button>
 

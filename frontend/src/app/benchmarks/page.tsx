@@ -36,12 +36,14 @@ const ALGO_COLOR: Record<string, string> = {
   fifo:         '#d98fa6',   // muted blossom
 };
 
-// Headline research results (offline, on real datasets — see DATASETS.md).
+// Headline research results (offline, on real public datasets; see /research for
+// the paper and dataset behind each number). Kept consistent with the committed
+// artifacts under ml/*/artifacts/metrics.json.
 const RESEARCH = [
-  { k: 'B1', label: 'DRL-PPO scheduler', metric: '+112%', sub: 'reward vs best baseline', dataset: 'Simulated cluster (Gymnasium)', tone: 'astra' },
-  { k: 'B3', label: 'LSTM prewarming',   metric: '0.085', sub: 'median N-RMSE (beats paper)', dataset: 'Azure Functions 2019 trace', tone: 'emerald' },
-  { k: 'B4', label: 'Syscall IDS',       metric: '0.80',  sub: 'accuracy @ 0.10 FPR', dataset: 'First-party Tetragon corpus (171k)', tone: 'rose' },
-  { k: 'B6', label: 'Carbon-aware',      metric: '45%',   sub: 'CO₂ cut (24h window)', dataset: 'UK Carbon Intensity API (live)', tone: 'purple' },
+  { k: 'B1', label: 'DRL-PPO scheduler', metric: 'real trace', sub: 'outperforms random placement', dataset: 'Google Cluster Trace 2011', tone: 'astra' },
+  { k: 'B3', label: 'LSTM prewarming',   metric: '49%',        sub: 'fewer cold starts (N-RMSE 0.17)', dataset: 'Azure Functions 2019 trace', tone: 'emerald' },
+  { k: 'B4', label: 'Syscall IDS',       metric: 'F1 0.82',    sub: 'LID-DS CVEs, beats STIDE and frequency', dataset: 'LID-DS 2021', tone: 'rose' },
+  { k: 'B6', label: 'Carbon-aware',      metric: '30%',        sub: 'CO2 cut at a 24h deferral budget', dataset: 'UK Carbon Intensity API (live)', tone: 'purple' },
 ];
 
 const TONE: Record<string, string> = {

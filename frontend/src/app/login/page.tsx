@@ -128,7 +128,7 @@ export default function LoginPage() {
 
         <a
           href="/api/auth/github/login"
-          className="w-full py-2.5 rounded-lg border border-edge-strong bg-surface hover:bg-raised
+          className="w-full mt-3 py-2.5 rounded-lg border border-edge-strong bg-surface hover:bg-raised
                      font-medium flex items-center justify-center gap-2 text-sm transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
