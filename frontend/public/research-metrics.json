@@ -1,0 +1,22 @@
+{
+  "B1": {
+    "measured": false,
+    "value": "retrain pending",
+    "detail": "Google Cluster Trace 2011 (clusterdata-2011-2)"
+  },
+  "B3": {
+    "measured": true,
+    "value": "49.4% fewer cold starts",
+    "detail": "forecast N-RMSE 0.1712"
+  },
+  "B4": {
+    "measured": true,
+    "value": "F1 0.82",
+    "detail": "beats STIDE 0.75, frequency 0.73"
+  },
+  "B6": {
+    "measured": true,
+    "value": "29.73% CO2 cut",
+    "detail": "real UK Carbon Intensity API (GB grid, actual gCO2/kWh, half-hourly)"
+  }
+}
