@@ -85,26 +85,116 @@ def global_prioritization(dag: TaskDAG, features: Dict[str, Dict[str, int]]) -> 
     return tasks
 
 
+def mean_compute_cost(task: Task, vms: List[VM]) -> float:
+    """Average compute time of `task` over all VMs: data/proc_rate + duration.
+
+    This is HEFT's w_i (the mean computation cost used to rank tasks), and it is
+    duration-aware, unlike `global_prioritization`'s structural weight.
+    """
+    if not vms:
+        return float(task.t_dur)
+    total = sum(task.data_size_mb / vm.proc_rate_mbps for vm in vms if vm.proc_rate_mbps > 0)
+    return total / len(vms) + float(task.t_dur)
+
+
+def mean_comm_cost(task: Task, vms: List[VM]) -> float:
+    """Average communication cost of shipping `task`'s output to another VM.
+
+    HEFT's c_ij. Averaged over VM bandwidths; zero when a single VM makes every
+    transfer local.
+    """
+    if len(vms) < 2:
+        return 0.0
+    bws = [vm.bandwidth_mbps for vm in vms if vm.bandwidth_mbps > 0]
+    if not bws:
+        return 0.0
+    return task.data_size_mb / (sum(bws) / len(bws))
+
+
+def upward_rank(dag: TaskDAG, vms: List[VM]) -> Dict[str, float]:
+    """HEFT upward rank (b-level) for every task.
+
+        rank_u(i) = w_i + max over successors j of ( c_ij + rank_u(j) )
+
+    with rank_u(exit) = w_exit. This is the length of the longest path from a task
+    to any exit node, in expected time, and is the priority HEFT schedules by.
+    Computed in reverse topological order so each task is visited after all of its
+    successors.
+    """
+    if dag.has_cycle():
+        raise CyclicDependencyError("DAG contains a cycle")
+
+    w = {t.task_id: mean_compute_cost(t, vms) for t in dag.get_all_tasks()}
+    c = {t.task_id: mean_comm_cost(t, vms) for t in dag.get_all_tasks()}
+
+    rank: Dict[str, float] = {}
+    for tid in reversed(_topological_sort(dag)):
+        best_succ = 0.0
+        for succ_id in dag.get_successors(tid):
+            # Successors are already ranked (reverse topological order).
+            best_succ = max(best_succ, c[tid] + rank.get(succ_id, 0.0))
+        rank[tid] = w[tid] + best_succ
+
+    # Any task missing from the topological order (isolated/unreachable) still
+    # needs a rank so callers can index it unconditionally.
+    for t in dag.get_all_tasks():
+        rank.setdefault(t.task_id, w[t.task_id])
+    return rank
+
+
+def prioritize_by_upward_rank(dag: TaskDAG, vms: List[VM]) -> List[Task]:
+    """Tasks sorted by decreasing upward rank (HEFT's task ordering)."""
+    rank = upward_rank(dag, vms)
+    tasks = dag.get_all_tasks()
+    tasks.sort(key=lambda t: rank[t.task_id], reverse=True)
+    return tasks
+
+
 def filter_admissible_pairs(
     sorted_tasks: List[Task],
     vms: List[VM],
     completed: Set[str],
     dag: TaskDAG,
     k: int = 10,
+    max_tasks: int | None = None,
+    scheduled: Set[str] | None = None,
 ) -> List[Tuple[Task, VM]]:
     """
     Admission Control (Eq 17): Return up to k valid (task, VM) pairs.
 
     A pair (task, vm) is admissible if:
-    1. All predecessors of task are in the completed set.
-    2. VM has sufficient resources: avail_cpu >= req_cpu, avail_mem >= req_mem, avail_disk >= req_disk.
+    1. The task has not already been scheduled.
+    2. All predecessors of task are in the completed set.
+    3. VM has sufficient resources: avail_cpu >= req_cpu, avail_mem >= req_mem, avail_disk >= req_disk.
+
+    `scheduled` is the set of task ids already placed. It must be supplied for
+    correct behaviour: without it a task stays admissible after being placed and
+    can be scheduled repeatedly, which both double-counts its cost and (because
+    the simulator only releases resources for tasks it has not yet completed)
+    leaks that task's CPU and memory permanently, deadlocking the episode with
+    most of the DAG unscheduled. It defaults to None only so that existing callers
+    and tests keep their original semantics.
+
+    `max_tasks` caps how many distinct ready tasks contribute pairs. The default
+    (None) keeps the original behaviour: pairs are emitted task-major and the
+    function returns as soon as k is reached, so with 4 VMs and k=10 only the top
+    ~2 ready tasks are ever reachable. Passing max_tasks together with a larger k
+    widens the candidate window so the policy can choose among more tasks.
     """
     pairs: List[Tuple[Task, VM]] = []
+    tasks_seen = 0
 
     for task in sorted_tasks:
+        if scheduled is not None and task.task_id in scheduled:
+            continue
+
         predecessors = dag.get_predecessors(task.task_id)
         if not all(p in completed for p in predecessors):
             continue
+
+        if max_tasks is not None and tasks_seen >= max_tasks:
+            break
+        tasks_seen += 1
 
         for vm in vms:
             if (vm.avail_cpu >= task.req_cpu and
