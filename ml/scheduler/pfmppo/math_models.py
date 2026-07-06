@@ -93,6 +93,7 @@ def pfmppo_reward(
     alpha2: float = 0.33,
     alpha3: float = 0.33,
     eps: float = 1e-6,
+    eps_lb: float = 1e-2,
 ) -> float:
     """
     Eq 30: PF-MPPO reward function (matches the paper).
@@ -102,8 +103,15 @@ def pfmppo_reward(
     balance), with alpha1 = 0.34 (latency) so the three sum to 1. Larger alpha1
     emphasizes minimizing completion time; larger alpha2/alpha3 emphasize energy
     and load balancing (paper section 3.4).
+
+    Numerical stability: LB is a standard deviation of utilizations and reaches
+    exactly 0 early in an episode (one task placed, all VMs equal). log(LB) is
+    unbounded there, so a 1e-6 floor injects +-4.6 reward spikes that reward
+    lucky spreading instead of scheduling quality and destabilise the critic.
+    LB therefore gets a coarser floor (1e-2, well below any meaningful imbalance);
+    T and E are bounded away from zero physically and keep the tight eps.
     """
     log_resp = math.log(max(response_t, eps))
     log_energy = math.log(max(energy, eps))
-    log_lb = math.log(max(load_balance, eps))
+    log_lb = math.log(max(load_balance, eps_lb))
     return -(alpha1 * log_resp + alpha2 * log_energy + alpha3 * log_lb)
