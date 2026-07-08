@@ -107,7 +107,11 @@ class PPOAgent:
         gamma: float = 0.9,
         epsilon: float = 0.2,
         value_coeff: float = 0.5,
-        entropy_coeff: float = 0.01,
+        entropy_coeff: float = 0.05,   # was 0.01: the policy collapsed to a single
+                                       # action (entropy -> 0, greedy-like); a stronger
+                                       # entropy bonus keeps it exploring VM choices so
+                                       # it can learn to spread load (beat concentrating
+                                       # heuristics like HEFT/Min-Min/Greedy)
         max_grad_norm: float = 0.5,
         update_epochs: int = 4,
         mini_batch_size: int = 64,
@@ -162,24 +166,33 @@ class PPOAgent:
         rewards: torch.Tensor,
         values: torch.Tensor,
         dones: torch.Tensor,
+        lam: float = 0.95,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute TD advantages: A_t = R_t + gamma * V(S_{t+1}) - V(S_t)
-        and discounted returns for value target.
+        Generalized Advantage Estimation (GAE-lambda).
+
+        A_t = sum_k (gamma*lam)^k * delta_{t+k},  delta_t = r_t + gamma*V(t+1) - V(t)
+
+        GAE replaces the earlier one-step TD advantage: with a critic that is
+        still learning, one-step deltas are mostly critic noise and the policy
+        gradient stalls (observed as actor_loss ~ 0 for the whole run). GAE
+        blends multi-step returns, so the advantage keeps real reward signal
+        even while the critic is imperfect. Returns (for the critic target)
+        are advantages + values.
         """
         n = len(rewards)
         advantages = torch.zeros(n, device=self.device)
-        returns = torch.zeros(n, device=self.device)
 
-        next_value = 0.0
+        gae = 0.0
         for t in reversed(range(n)):
-            if t == n - 1:
-                next_val = 0.0
-            else:
-                next_val = values[t + 1].item() * (1.0 - dones[t + 1].item())
+            nonterminal = 1.0 - dones[t].item()
+            next_val = values[t + 1].item() if t < n - 1 else 0.0
+            next_nonterminal = (1.0 - dones[t + 1].item()) if t < n - 1 else 0.0
+            delta = rewards[t].item() + self.gamma * next_val * next_nonterminal - values[t].item()
+            gae = delta + self.gamma * lam * nonterminal * gae
+            advantages[t] = gae
 
-            returns[t] = rewards[t] + self.gamma * next_val * (1.0 - dones[t])
-            advantages[t] = returns[t] - values[t]
+        returns = advantages + values
 
         # Normalize advantages
         if advantages.std() > 1e-8:
@@ -240,8 +253,12 @@ class PPOAgent:
                 surr2 = torch.clamp(ratio, 1.0 - self.epsilon, 1.0 + self.epsilon) * batch_advantages
                 actor_loss = -torch.min(surr1, surr2).mean()
 
-                # Critic loss (Eq 33)
-                critic_loss = nn.functional.mse_loss(state_values, batch_returns)
+                # Critic loss (Eq 33). Huber (smooth L1) instead of plain MSE: the
+                # value targets are episode-scale and occasionally large, and MSE
+                # squared those into a critic loss in the thousands that never
+                # settled, corrupting the GAE advantages. Huber is linear in the
+                # tail, so the critic converges and the advantages stay meaningful.
+                critic_loss = nn.functional.smooth_l1_loss(state_values, batch_returns)
 
                 # Total loss
                 loss = actor_loss + self.value_coeff * critic_loss - self.entropy_coeff * entropy
