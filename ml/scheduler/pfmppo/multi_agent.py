@@ -55,6 +55,9 @@ class WorkerAgent:
             template_ratio=env_config.get("template_ratio", 0.7),
             data_dir=env_config.get("data_dir"),
             max_files=env_config.get("max_files", 10),
+            reward_mode=env_config.get("reward_mode", "paper"),
+            feature_mode=env_config.get("feature_mode", "paper"),
+            max_tasks_in_window=env_config.get("max_tasks_in_window"),
         )
 
     def collect_trajectory(self, steps: int) -> RolloutBuffer:
@@ -140,7 +143,8 @@ class CTDETrainer:
         env_config.setdefault("k_pairs", k_pairs)
         self.env_config = env_config
 
-        input_dim = k_pairs * 10
+        from ml.scheduler.pfmppo.env import features_per_pair
+        input_dim = k_pairs * features_per_pair(env_config.get("feature_mode", "paper"))
         self.network = PFMPPONetwork(input_dim=input_dim, k_pairs=k_pairs)
 
         self.global_agent = PPOAgent(
