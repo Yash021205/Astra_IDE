@@ -87,7 +87,7 @@ def create_workspace_for_user(
     from app.core.metrics import WORKSPACES_CREATED, SANDBOX_TIER, SCHEDULER_DECISIONS
     WORKSPACES_CREATED.inc()
     SANDBOX_TIER.labels(tier).inc()
-    SCHEDULER_DECISIONS.labels("ppo").inc()
+    SCHEDULER_DECISIONS.labels(decision.algorithm).inc()
 
     # Build the Pod manifest that ENFORCES the tier (runtimeClassName + hardening).
     # Submitting it needs a live cluster; the manifest itself is built + audited
