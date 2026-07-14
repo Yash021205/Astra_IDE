@@ -62,10 +62,15 @@ class Settings(BaseSettings):
     # Default to the trained DRL policy; if the model file is absent/unloadable the
     # inference service returns None and scheduler_service falls back to the
     # heuristic automatically — so this is safe even before the artifact is committed.
-    scheduler_algorithm: str = "pfmppo"          # "heuristic" | "pfmppo"
+    scheduler_algorithm: str = "cp_ppo"          # "heuristic" | "pfmppo" | "cp_ppo"
     pfmppo_model_path: str = "ml/scheduler/pfmppo/artifacts/model.pt"  # repo-relative ok
     pfmppo_rule_library_dir: str = ""            # path to rule library directory
     pfmppo_k_pairs: int = 10                     # K parameter (top-K task-VM pairs)
+    # CP-PPO: critical-path-guided policy (pair-scoring net, rich features). Serves
+    # the greedy policy for one live placement. Falls back to the heuristic if the
+    # artifact is absent or torch is unavailable.
+    cp_ppo_model_path: str = "ml/scheduler/pfmppo/artifacts/cp_ppo.pt"
+    cp_ppo_k_pairs: int = 24
 
     # ── CORS ─────────────────────────────────────────────────────────────────
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001"]
