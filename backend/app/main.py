@@ -98,6 +98,31 @@ def health_check():
     return {"status": "ok", "service": settings.app_name, "env": settings.environment}
 
 
+@app.get(f"{settings.api_prefix}/health", tags=["health"])
+def api_health():
+    """Public liveness probe reachable from the browser.
+
+    `/healthz` sits outside the API prefix, so the reverse proxy routes it to the
+    frontend rather than here. The UI's status indicator needs a path under the API
+    prefix so it resolves through both Caddy and the Vercel rewrite. It also reports
+    whether the real Kubernetes backing is live, so the dot doubles as a signal that
+    the cluster wiring is up and not just the web process.
+    """
+    k8s_live = False
+    try:
+        from app.services import cluster_state
+        k8s_live = bool(cluster_state._use_k8s() and cluster_state.all_clusters())
+    except Exception:
+        k8s_live = False
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "env": settings.environment,
+        "k8s": k8s_live,
+        "scheduler": settings.scheduler_algorithm,
+    }
+
+
 @app.get("/metrics", tags=["monitoring"])
 def metrics():
     """Prometheus scrape endpoint (kube-prometheus-stack / ServiceMonitor)."""
