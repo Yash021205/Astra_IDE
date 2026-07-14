@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import auth, workspaces, carbon, events, metrics, benchmarks, system, admin, pods, github
+from app.api import auth, workspaces, carbon, events, metrics, benchmarks, system, admin, pods, github, scheduler
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -13,3 +13,4 @@ api_router.include_router(system.router)
 api_router.include_router(admin.router)
 api_router.include_router(pods.router)
 api_router.include_router(github.router)
+api_router.include_router(scheduler.router)
