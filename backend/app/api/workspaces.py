@@ -447,6 +447,38 @@ def preview(workspace_id: int, path: str, token: str | None = None,
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/{workspace_id}/ports")
+def workspace_ports(workspace_id: int, token: str | None = None,
+                    db: Session = Depends(get_db)):
+    """Ports a dev server is listening on inside the running workspace container,
+    so the Preview panel can offer real ports to proxy."""
+    user_id = decode_access_token(token) if token else None
+    if user_id is None or not sharing_service.user_can_access(db, workspace_id, int(user_id)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from app.services import container_service
+    return {"ports": container_service.list_listening_ports(workspace_id)}
+
+
+@router.get("/{workspace_id}/proxy/{port}/{path:path}")
+def workspace_proxy(workspace_id: int, port: int, path: str = "",
+                    token: str | None = None, db: Session = Depends(get_db)):
+    """Reverse-proxy a live dev server running inside the workspace container
+    (127.0.0.1:<port>) so it can be previewed in the IDE iframe. Auth via query
+    token (iframes can't send the Authorization header)."""
+    from fastapi.responses import Response
+    user_id = decode_access_token(token) if token else None
+    if user_id is None or not sharing_service.user_can_access(db, workspace_id, int(user_id)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from app.services import container_service
+    res = container_service.fetch_port(workspace_id, port, path)
+    if res is None:
+        raise HTTPException(status_code=502,
+                            detail=f"No server responding on port {port} in this workspace")
+    data, ctype = res
+    return Response(content=data, media_type=ctype,
+                    headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"})
+
+
 @router.get("/{workspace_id}/raw")
 def raw_file(workspace_id: int, path: str, token: str | None = None,
              db: Session = Depends(get_db)):
