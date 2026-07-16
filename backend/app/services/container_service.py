@@ -165,3 +165,62 @@ def logs(ws_id: int, tail: int = 50) -> list[str]:
         return out.splitlines() if out else []
     except Exception:
         return []
+
+
+# ── Port discovery + in-container HTTP proxy (live preview of a dev server) ─────
+
+def list_listening_ports(ws_id: int) -> list[int]:
+    """TCP ports something is listening on INSIDE the workspace container, so the
+    preview UI can offer real dev-server ports. Best-effort: needs ss or netstat
+    in the image (present on most dev images); returns [] otherwise."""
+    if not is_running(ws_id):
+        return []
+    try:
+        r = _docker(["exec", _name(ws_id), "sh", "-c",
+                     "ss -tlnH 2>/dev/null || netstat -tln 2>/dev/null"], timeout=10)
+    except Exception:
+        return []
+    import re
+    ports: set[int] = set()
+    for line in (r.stdout or "").splitlines():
+        m = re.search(r"[:.](\d{2,5})\s", line + " ")   # port in the local-address column
+        if m:
+            p = int(m.group(1))
+            if 1 <= p <= 65535:
+                ports.add(p)
+    return sorted(ports)
+
+
+def fetch_port(ws_id: int, port: int, path: str) -> tuple[bytes, str] | None:
+    """HTTP GET a dev server running inside the container at 127.0.0.1:<port>/<path>
+    and return (body, content_type), or None if unreachable. Runs the request with
+    whatever HTTP client the image already has (curl / wget / python / node), so it
+    works even for a `--network none` sandbox. Content type is inferred from the path."""
+    if not is_running(ws_id):
+        return None
+    p = (path or "").lstrip("/")
+    url = f"http://127.0.0.1:{int(port)}/{p}"
+    name = _name(ws_id)
+    pyfetch = (f"import urllib.request,sys;"
+               f"sys.stdout.buffer.write(urllib.request.urlopen({url!r},timeout=10).read())")
+    nodefetch = (f"const h=require('http');h.get({url!r},r=>{{const d=[];"
+                 f"r.on('data',c=>d.push(c));r.on('end',()=>process.stdout.write(Buffer.concat(d)))}})"
+                 f".on('error',()=>process.exit(1))")
+    attempts = [
+        ["curl", "-sS", "-m", "10", url],
+        ["wget", "-qO-", "-T", "10", url],
+        ["python3", "-c", pyfetch],
+        ["python", "-c", pyfetch],
+        ["node", "-e", nodefetch],
+    ]
+    for argv in attempts:
+        try:
+            r = subprocess.run(["docker", "exec", name, *argv],
+                               capture_output=True, timeout=15)   # bytes (no text=True)
+        except Exception:
+            continue
+        if r.returncode == 0 and r.stdout:
+            import mimetypes
+            ctype = mimetypes.guess_type(p or "index.html")[0] or "text/html; charset=utf-8"
+            return r.stdout, ctype
+    return None
