@@ -14,6 +14,12 @@ httpx==0.28.1
 redis==5.2.1
 websockets==14.1
 python-dotenv==1.0.1
+--extra-index-url https://download.pytorch.org/whl/cpu
 prometheus-client==0.21.1
 minio==7.2.12
 cryptography==43.0.3
+kubernetes==31.0.0
+# numpy is imported directly by the scheduler inference services; torch does not
+# guarantee it as a dependency, so pin it explicitly.
+numpy==2.1.3
+torch==2.5.1+cpu
