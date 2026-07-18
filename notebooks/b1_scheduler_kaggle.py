@@ -53,7 +53,11 @@ DATA = WORK / "data" / "google_trace"
 (DATA / "machine_events").mkdir(parents=True, exist_ok=True)
 (DATA / "task_events").mkdir(parents=True, exist_ok=True)
 
-N_TASK_PARTS = 4          # of 500; 4 parts is plenty for a solid first policy. Raise later.
+N_TASK_PARTS = 50         # of 500. Kaggle has ~100GB+ scratch, so more is fine; 50 parts
+                          # (~4GB compressed) gives a large, representative slice. You can
+                          # push this to 200-500 for the full trace, but parsing gets slow
+                          # (many minutes) and it does not change the baseline comparison -
+                          # it improves generalization, not the reward ranking on this env.
 
 def _get(url, dest):
     if Path(dest).exists() and Path(dest).stat().st_size > 0:
