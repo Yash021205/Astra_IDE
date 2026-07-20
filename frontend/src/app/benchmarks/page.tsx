@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import AppShell from '../../components/AppShell';
+import SchedulerExplorer from '../../components/SchedulerExplorer';
 import SvgBarChart, { type BarDatum } from '../../components/ui/SvgBarChart';
 import FaqAccordion, { type FaqItem } from '../../components/ui/FaqAccordion';
 import {
@@ -117,6 +118,14 @@ export default function BenchmarksPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Live scheduler explorer — compare all algorithms on a chosen workload */}
+          <div>
+            <h2 className="t-overline text-faint mb-3 flex items-center gap-1.5">
+              <Settings2 size={13} /> Scheduler explorer — compare all eight algorithms
+            </h2>
+            <SchedulerExplorer />
           </div>
 
           {/* Live simulator */}
