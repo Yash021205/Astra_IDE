@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Activity, Cpu, Gauge, MemoryStick, ShieldCheck, Timer,
+  Activity, Cpu, Gauge, MemoryStick, ShieldCheck, Timer, Play, Pause,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar,
@@ -32,6 +32,8 @@ export default function ObservabilityPage() {
   const [snap, setSnap] = useState<SandboxMetrics | null>(null);
   const [cpuSeries, setCpuSeries] = useState<Sample[]>([]);
   const [startSeries, setStartSeries] = useState<Sample[]>([]);
+  const [paused, setPaused] = useState(false);
+  const [shown, setShown] = useState<Record<string, boolean>>({ runc: true, gvisor: true, firecracker: true });
   const seq = useRef(0);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function ObservabilityPage() {
     let cancelled = false;
 
     async function poll() {
+      if (paused) return;
       try {
         const m = await getSandboxMetrics();
         if (cancelled) return;
@@ -61,7 +64,7 @@ export default function ObservabilityPage() {
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
-  }, [token, hydrated]);
+  }, [token, hydrated, paused]);
 
   return (
     <AppShell>
@@ -75,6 +78,27 @@ export default function ObservabilityPage() {
             Live runtime cost of each isolation tier — what the adaptive sandbox (B4) trades for
             stronger isolation. Streamed every {POLL_MS / 1000}s.
           </p>
+        </div>
+
+        {/* Controls: pause the live stream, and toggle which tiers the charts show. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setPaused((p) => !p)}
+                  className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                    paused ? 'border-emerald-500/60 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/10'
+                           : 'border-edge-strong text-ink hover:bg-raised')}>
+            {paused ? <Play size={14} /> : <Pause size={14} />}{paused ? 'Resume live' : 'Pause live'}
+          </button>
+          <span className="mx-1 text-xs text-faint">Show tiers:</span>
+          {(['runc', 'gvisor', 'firecracker'] as const).map((tier) => (
+            <button key={tier} type="button"
+                    onClick={() => setShown((s) => ({ ...s, [tier]: !s[tier] }))}
+                    aria-pressed={shown[tier]}
+                    className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                      shown[tier] ? 'text-ink' : 'text-faint opacity-60',
+                      'border-edge-strong hover:bg-raised')}>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: TIER_COLOR[tier] }} />{tier}
+            </button>
+          ))}
         </div>
 
         {/* Tier KPI cards */}
@@ -114,9 +138,9 @@ export default function ObservabilityPage() {
                 <XAxis dataKey="t" tick={false} stroke="rgb(var(--c-faint))" />
                 <YAxis tick={{ fontSize: 11, fill: 'rgb(var(--c-faint))' }} stroke="rgb(var(--c-edge))" unit="%" />
                 <RTooltip contentStyle={TOOLTIP} />
-                <Area type="monotone" dataKey="runc" stroke={TIER_COLOR.runc} fill="url(#g-runc)" strokeWidth={2} isAnimationActive={false} />
-                <Area type="monotone" dataKey="gvisor" stroke={TIER_COLOR.gvisor} fill="url(#g-gvisor)" strokeWidth={2} isAnimationActive={false} />
-                <Area type="monotone" dataKey="firecracker" stroke={TIER_COLOR.firecracker} fill="url(#g-firecracker)" strokeWidth={2} isAnimationActive={false} />
+                {shown.runc && <Area type="monotone" dataKey="runc" stroke={TIER_COLOR.runc} fill="url(#g-runc)" strokeWidth={2} isAnimationActive={false} />}
+                {shown.gvisor && <Area type="monotone" dataKey="gvisor" stroke={TIER_COLOR.gvisor} fill="url(#g-gvisor)" strokeWidth={2} isAnimationActive={false} />}
+                {shown.firecracker && <Area type="monotone" dataKey="firecracker" stroke={TIER_COLOR.firecracker} fill="url(#g-firecracker)" strokeWidth={2} isAnimationActive={false} />}
               </AreaChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -129,9 +153,9 @@ export default function ObservabilityPage() {
                 <YAxis tick={{ fontSize: 11, fill: 'rgb(var(--c-faint))' }} stroke="rgb(var(--c-edge))" unit="ms" />
                 <RTooltip contentStyle={TOOLTIP} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="runc" stroke={TIER_COLOR.runc} strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="gvisor" stroke={TIER_COLOR.gvisor} strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="firecracker" stroke={TIER_COLOR.firecracker} strokeWidth={2} dot={false} isAnimationActive={false} />
+                {shown.runc && <Line type="monotone" dataKey="runc" stroke={TIER_COLOR.runc} strokeWidth={2} dot={false} isAnimationActive={false} />}
+                {shown.gvisor && <Line type="monotone" dataKey="gvisor" stroke={TIER_COLOR.gvisor} strokeWidth={2} dot={false} isAnimationActive={false} />}
+                {shown.firecracker && <Line type="monotone" dataKey="firecracker" stroke={TIER_COLOR.firecracker} strokeWidth={2} dot={false} isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
