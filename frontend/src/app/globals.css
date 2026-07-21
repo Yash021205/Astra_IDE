@@ -112,6 +112,29 @@ html, body {
     border-color: rgb(var(--c-edge) / 0.6);
   }
   .dark .glass { background: rgb(var(--c-surface) / 0.45); }
+
+  /* Neon hover accent for cards. Set --neon per card (e.g. style={{'--neon':'168 85 247'}})
+     to give each its own colour; on hover the border lights up and a soft glow spikes in.
+     Deliberately NOT tied to the theme palette - a sudden pop of colour on interaction. */
+  .neon-hover {
+    --neon: 34 211 238;                 /* default cyan */
+    position: relative;
+    transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+  }
+  .neon-hover:hover {
+    border-color: rgb(var(--neon) / 0.85) !important;
+    box-shadow: 0 0 0 1px rgb(var(--neon) / 0.35),
+                0 8px 30px -6px rgb(var(--neon) / 0.45),
+                0 0 22px -2px rgb(var(--neon) / 0.35);
+    transform: translateY(-3px);
+  }
+  .neon-hover::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: radial-gradient(120% 80% at 50% 0%, rgb(var(--neon) / 0.10), transparent 60%);
+    opacity: 0; transition: opacity .25s ease;
+  }
+  .neon-hover:hover::after { opacity: 1; }
+
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-astra-700 px-4 py-2
            text-sm font-medium text-white transition-colors hover:bg-astra-800

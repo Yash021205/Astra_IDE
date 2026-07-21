@@ -12,6 +12,8 @@ import TextHoverEffect     from '../components/ui/TextHoverEffect';
 import TeamPhoto           from '../components/ui/TeamPhoto';
 import AnimatedTerminal, { type TerminalLine } from '../components/ui/AnimatedTerminal';
 import LayoutGrid, { type GridCard } from '../components/ui/LayoutGrid';
+import ComparisonTable     from '../components/ui/ComparisonTable';
+import SchedulerCompare     from '../components/ui/SchedulerCompare';
 import NoiseBackground     from '../components/ui/NoiseBackground';
 import BigFooter           from '../components/ui/BigFooter';
 import CountUp             from '../components/ui/CountUp';
@@ -188,7 +190,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div className="space-y-6">
               <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400">Live globe</p>
-              <h2 className="t-liquid text-3xl md:text-5xl leading-tight">
+              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight t-liquid leading-tight">
                 Workspaces around the world
               </h2>
               <p className="text-muted leading-relaxed max-w-lg">
@@ -223,7 +225,7 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto px-6">
           <div className="mb-10 text-center">
             <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">Live demo</p>
-            <h2 className="t-liquid text-3xl md:text-5xl">Adaptive sandboxing, in real time</h2>
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight t-liquid">Adaptive sandboxing, in real time</h2>
             <p className="text-muted mt-4 max-w-2xl mx-auto">
               When a user submits code, the risk scorer routes it to the right isolation tier:
               <span className="text-emerald-600 dark:text-emerald-400"> runc </span>(low overhead),
@@ -241,13 +243,49 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="mb-12 text-center">
             <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">Seven breakthroughs</p>
-            <h2 className="t-liquid text-3xl md:text-5xl">Built for research, designed for production</h2>
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight t-liquid">Built for research, designed for production</h2>
             <p className="text-muted mt-4 max-w-xl mx-auto">
               Click any card to see what it does in plain language and how to use it.
             </p>
           </div>
 
           <LayoutGrid cards={FEATURE_CARDS} />
+        </div>
+      </section>
+
+      {/* SCHEDULER ALGORITHMS + BENCHMARK */}
+      <section className="relative bg-bg py-16 border-t border-edge overflow-hidden">
+        <SectionBlobs />
+        <div className="relative max-w-6xl mx-auto px-6">
+          <div className="mb-10">
+            <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">Scheduling</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-ink">
+              Eight schedulers, one honest benchmark
+            </h2>
+            <p className="text-muted mt-4 max-w-2xl">
+              Placement is a choice, not a black box. Compare deep-RL against the classical
+              heuristics on real workloads and pick what fits.
+            </p>
+          </div>
+          <SchedulerCompare />
+        </div>
+      </section>
+
+      {/* COMPETITOR COMPARISON */}
+      <section className="relative bg-bg py-16 border-t border-edge overflow-hidden">
+        <SectionBlobs />
+        <div className="relative max-w-6xl mx-auto px-6">
+          <div className="mb-10 text-center">
+            <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-3">How it compares</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-ink">
+              A research control plane the others don't have
+            </h2>
+            <p className="text-muted mt-4 max-w-2xl mx-auto">
+              Mainstream cloud IDEs fix their scheduling, isolation and placement. ASTRA-IDE
+              makes each an adaptive, measured decision.
+            </p>
+          </div>
+          <ComparisonTable />
         </div>
       </section>
 
@@ -262,9 +300,10 @@ export default function HomePage() {
           <div className="mt-8">
             <p className="text-xs uppercase tracking-widest text-astra-600 dark:text-astra-400 mb-6 text-center">Team</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {TEAM.map((m) => (
+              {TEAM.map((m, i) => (
                 <ThreeDCard key={m.roll} intensity={10}>
-                  <div className="p-5 card text-center">
+                  <div className="p-5 card neon-hover text-center"
+                       style={{ ['--neon' as any]: ['168 85 247', '34 211 238', '244 114 182'][i % 3] }}>
                     <TeamPhoto src={m.img} alt={m.name} size={96} />
                     <div className="font-semibold mt-3">{m.name}</div>
                     <div className="text-xs text-faint mt-0.5 font-mono">{m.roll}</div>
@@ -311,19 +350,18 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-// Soft blurred colour blobs behind a section (subtle in dark, richer in light)
-// so content sections don't look bland. Place as first child of a `relative
-// overflow-hidden` section.
-function SectionBlobs({ a = '#818cf8', b = '#f472b6', c = '#38bdf8' }: { a?: string; b?: string; c?: string }) {
+// Minimal, Vercel-style faint dot grid that fades toward the edges — replaces the
+// old colour blobs. Keeps sections clean and white in light mode; the colour now
+// lives on the cards and hover states instead. (Props kept for call-site compat.)
+function SectionBlobs(_props: { a?: string; b?: string; c?: string }) {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -left-16 -top-16 w-[40rem] h-[40rem] rounded-full blur-[60px] opacity-100 dark:opacity-40"
-           style={{ background: `radial-gradient(circle, ${a}, transparent 60%)` }} />
-      <div className="absolute -right-20 -bottom-16 w-[44rem] h-[44rem] rounded-full blur-[60px] opacity-100 dark:opacity-35"
-           style={{ background: `radial-gradient(circle, ${b}, transparent 60%)` }} />
-      <div className="absolute left-1/3 top-1/4 w-[28rem] h-[28rem] rounded-full blur-[60px] opacity-90 dark:opacity-25"
-           style={{ background: `radial-gradient(circle, ${c}, transparent 62%)` }} />
-    </div>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0"
+         style={{
+           backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.13) 1px, transparent 1px)',
+           backgroundSize: '22px 22px',
+           maskImage: 'radial-gradient(ellipse 70% 60% at 50% 35%, black, transparent 82%)',
+           WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 35%, black, transparent 82%)',
+         }} />
   );
 }
 
