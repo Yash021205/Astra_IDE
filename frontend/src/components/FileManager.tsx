@@ -6,7 +6,7 @@ import {
   ChevronRight, ChevronsDownUp, Folder, FolderOpen, FolderPlus, FilePlus,
   FileCode2, FileText, FileJson, FileTerminal, FileImage, Image as ImageIcon,
   GitBranch, RefreshCw, Save, Search, TerminalSquare, Trash2, Loader2, X, Check, Palette,
-  PanelLeft, GripHorizontal, Upload,
+  PanelLeft, GripHorizontal, Upload, Copy,
 } from 'lucide-react';
 
 const Terminal = dynamic(() => import('./Terminal'), { ssr: false });
@@ -461,7 +461,21 @@ export default function FileManager({ workspaceId, frozen = false, onActiveFile,
         </div>
 
         {/* Editor area (shrinks when the terminal panel is open) */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
+          {sel && (
+            <div className="h-8 shrink-0 px-3 flex items-center gap-1.5 border-b border-edge bg-raised/40 text-xs">
+              <span className="font-mono text-ink truncate" title={sel}>{sel}</span>
+              <button type="button" title="Copy path"
+                      onClick={() => {
+                        try { navigator.clipboard?.writeText(sel); toast.success('Path copied', sel); }
+                        catch { /* clipboard unavailable */ }
+                      }}
+                      className="ml-1 p-1 rounded text-faint hover:text-ink hover:bg-raised transition-colors">
+                <Copy size={12} />
+              </button>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
           {sel && isImage(sel) ? (
             <div className="h-full overflow-auto grid place-items-center p-6 bg-[repeating-conic-gradient(theme(colors.slate.500/10%)_0%_25%,transparent_0%_50%)] bg-[length:24px_24px]">
               <div className="text-center">
@@ -500,6 +514,7 @@ export default function FileManager({ workspaceId, frozen = false, onActiveFile,
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Integrated terminal (toggle from the toolbar) — resizable, drag the

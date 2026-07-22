@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth';
 import { uploadToImgbb, updateProfile } from '../lib/api';
 import { toast } from '../lib/toast';
 import ThemeToggle from './ThemeToggle';
+import BackendStatus from './BackendStatus';
 import { Avatar } from './AvatarInline';
 import Tooltip from './ui/Tooltip';
 import { cn } from '../lib/utils';
@@ -85,6 +86,7 @@ export default function Navbar({ variant = 'default' }: { variant?: 'default' | 
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
+          <BackendStatus />
           <ThemeToggle className={isHero ? '!text-muted hover:!text-ink hover:!bg-ink/5 dark:!text-white/70 dark:hover:!text-white dark:hover:!bg-white/10' : ''} />
 
           {!loggedIn ? (
