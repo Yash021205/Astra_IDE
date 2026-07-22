@@ -10,17 +10,20 @@
 // The user can close the whole panel; the parent restores it when a Run
 // happens (it pushes new output, opens automatically).
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, X, Terminal as TerminalIcon, AlertOctagon, FileOutput } from 'lucide-react';
+import { ChevronDown, X, Terminal as TerminalIcon, AlertOctagon, FileOutput, Power } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { ExecuteResponse } from '../lib/api';
+import Terminal from './Terminal';
 
 interface Props {
-  result?:    ExecuteResponse | null;
-  running?:   boolean;
-  onClose?:   () => void;
-  workspace?: { name: string; language: string; sandbox: string };
+  result?:      ExecuteResponse | null;
+  running?:     boolean;
+  onClose?:     () => void;
+  workspace?:   { name: string; language: string; sandbox: string };
+  workspaceId?: number;
+  status?:      string;   // workspace status; a real shell needs a RUNNING container
 }
 
 type Tab = 'output' | 'problems' | 'terminal';
@@ -54,33 +57,13 @@ function parseProblems(stderr: string): ProblemRow[] {
   return rows;
 }
 
-export default function BottomPanel({ result, running, onClose, workspace }: Props) {
+export default function BottomPanel({ result, running, onClose, workspace, workspaceId, status }: Props) {
   const [tab, setTab] = useState<Tab>('output');
-  const [termLines, setTermLines] = useState<{ kind: 'info' | 'cmd' | 'out' | 'err'; text: string }[]>([
-    { kind: 'info', text: 'ASTRA-IDE shell (read-only demo). Ctrl+J toggles this panel.' },
-  ]);
-  const termRef = useRef<HTMLDivElement>(null);
 
-  // When a new run lands, switch to Output tab and emit terminal log
+  // When a new run lands, switch to the Output tab so the result is visible.
   useEffect(() => {
-    if (!result) return;
-    setTab('output');
-    setTermLines((lines) => [
-      ...lines,
-      { kind: 'cmd', text: `astra exec --lang ${result.language}` },
-      { kind: 'info', text: `[sandbox=${workspace?.sandbox ?? '?'} runtime=${result.runtime_ms}ms]` },
-      ...(result.stdout ? result.stdout.split('\n').map((t) => ({ kind: 'out' as const, text: t })) : []),
-      ...(result.stderr ? result.stderr.split('\n').map((t) => ({ kind: 'err' as const, text: t })) : []),
-      { kind: 'info', text: `exit ${result.exit_code}${result.timeout ? ' (timeout)' : ''}` },
-    ]);
-  }, [result, workspace?.sandbox]);
-
-  // Autoscroll terminal
-  useEffect(() => {
-    if (tab === 'terminal' && termRef.current) {
-      termRef.current.scrollTop = termRef.current.scrollHeight;
-    }
-  }, [tab, termLines]);
+    if (result) setTab('output');
+  }, [result]);
 
   const problems = useMemo(() => parseProblems(result?.stderr ?? ''), [result]);
 
@@ -189,25 +172,24 @@ export default function BottomPanel({ result, running, onClose, workspace }: Pro
               key="terminal"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="absolute inset-0 bg-black"
+              className="absolute inset-0"
             >
-              <div ref={termRef} className="h-full overflow-y-auto p-3 text-[12px] leading-relaxed">
-                {termLines.map((l, idx) => (
-                  <div key={idx} className={cn('whitespace-pre-wrap',
-                    l.kind === 'cmd'  && 'text-emerald-400',
-                    l.kind === 'info' && 'text-slate-500 italic',
-                    l.kind === 'out'  && 'text-slate-200',
-                    l.kind === 'err'  && 'text-rose-300',
-                  )}>
-                    {l.kind === 'cmd' && <span className="text-astra-400 mr-1.5">$</span>}
-                    {l.text}
-                  </div>
-                ))}
-                <div className="flex items-center mt-1 text-slate-400">
-                  <span className="text-astra-400 mr-1.5">$</span>
-                  <span className="inline-block w-2 h-3.5 bg-slate-300 animate-pulse" />
+              {workspaceId != null && status === 'RUNNING' ? (
+                // Real interactive shell: xterm.js bridged to the workspace container
+                // (docker exec) over a WebSocket PTY. Same file tree as the Explorer.
+                <Terminal workspaceId={workspaceId} />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center gap-2 bg-black/90 text-center px-4">
+                  <Power size={22} className="text-slate-500" />
+                  <p className="text-slate-300 text-[13px] font-sans">
+                    {workspaceId == null ? 'Terminal unavailable' : 'Start the workspace to open a shell'}
+                  </p>
+                  <p className="text-slate-500 text-[11px] font-sans max-w-sm">
+                    The interactive terminal runs a real shell inside this workspace{"'"}s sandbox
+                    container. It becomes available once the workspace is running.
+                  </p>
                 </div>
-              </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -429,6 +429,8 @@ export default function CollabEditor({
           result={output}
           running={running}
           onClose={() => setOutput(null)}
+          workspaceId={workspaceId}
+          status={status}
           workspace={{
             name:     `ws-${workspaceId}`,
             language: currentLang,
