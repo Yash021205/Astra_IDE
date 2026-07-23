@@ -265,9 +265,20 @@ export function rawFileUrl(workspaceId: number, path: string): string {
   return `/api/workspaces/${workspaceId}/raw?path=${encodeURIComponent(path)}&token=${encodeURIComponent(authToken())}`;
 }
 
-/** Static-preview URL for an in-iframe live preview. */
+/** Static-preview URL for an in-iframe live preview (serves workspace files). */
 export function previewUrl(workspaceId: number, path = 'index.html'): string {
   return `/api/workspaces/${workspaceId}/preview/${path}?token=${encodeURIComponent(authToken())}`;
+}
+
+/** Live-server preview: reverse-proxy a dev server running inside the container on `port`. */
+export function proxyUrl(workspaceId: number, port: number, path = ''): string {
+  return `/api/workspaces/${workspaceId}/proxy/${port}/${path}?token=${encodeURIComponent(authToken())}`;
+}
+
+/** Ports a dev server is listening on inside the running workspace container. */
+export async function getWorkspacePorts(workspaceId: number): Promise<number[]> {
+  const { data } = await api.get<{ ports: number[] }>(`/workspaces/${workspaceId}/ports`);
+  return data.ports ?? [];
 }
 
 // ── Change history / exclusions / freeze ─────────────────────────────────────
@@ -439,6 +450,22 @@ export interface BenchmarkRunLog {
 
 export async function getBenchmarkHistory(limit = 20): Promise<BenchmarkRunLog[]> {
   const { data } = await api.get<BenchmarkRunLog[]>(`/benchmarks/history?limit=${limit}`);
+  return data;
+}
+
+// ── Scheduler comparison ─────────────────────────────────────────────────────
+export interface SchedulerChoice {
+  algorithm: string; label: string; cluster_id: string; node_name: string;
+  score: number; reasoning: string;
+}
+export interface SchedulerCompareResponse {
+  workload: { cpu: number; memory: number; tier: string; language: string };
+  results: SchedulerChoice[];
+}
+export async function compareSchedulers(
+  p: { cpu: number; memory: number; tier: string; language: string },
+): Promise<SchedulerCompareResponse> {
+  const { data } = await api.get<SchedulerCompareResponse>('/scheduler/compare', { params: p });
   return data;
 }
 
