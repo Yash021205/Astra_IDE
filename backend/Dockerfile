@@ -24,10 +24,14 @@ RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.
     && rm -rf /tmp/docker /tmp/docker.tgz \
     && docker --version
 
-COPY requirements.txt .
+# Build context is the REPO ROOT (see docker-compose / CI) so the ml/ package is
+# reachable. This is required for real model serving: pfmppo_inference and
+# cp_ppo_inference import ml.scheduler.pfmppo.* at runtime.
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ ./app/
+COPY backend/app/ ./app/
+COPY ml/ ./ml/
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000

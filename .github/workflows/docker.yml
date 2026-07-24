@@ -18,7 +18,17 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [backend, frontend, collab-server]
+        include:
+          # backend builds from the repo root so the ml/ package is in context.
+          - service: backend
+            context: .
+            dockerfile: backend/Dockerfile
+          - service: frontend
+            context: ./frontend
+            dockerfile: frontend/Dockerfile
+          - service: collab-server
+            context: ./collab-server
+            dockerfile: collab-server/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +51,8 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.service }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push:    true
           tags: |
             ${{ steps.meta.outputs.tag }}:latest
