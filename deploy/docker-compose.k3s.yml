@@ -1,0 +1,35 @@
+# Wires the Compose backend to the real k3s cluster running on the same host.
+#
+# Topology: Compose keeps serving the site and the data tier (postgres/redis/minio),
+# while k3s is the real Kubernetes cluster the backend manages. With these settings
+# the backend stops using the built-in simulator and instead:
+#   * reads real node capacity + live metrics-server telemetry for the dashboard
+#     (cluster_state.refresh_from_kubernetes),
+#   * creates real workspace Pods with the selected runtimeClassName
+#     (sandbox_runtime.apply_workspace_pod),
+#   * places them with the trained CP-PPO policy (cp_ppo_inference).
+#
+# The kubeconfig is a copy of /etc/rancher/k3s/k3s.yaml with the server rewritten
+# from 127.0.0.1 to the host's internal IP, because 127.0.0.1 inside the container
+# is the container itself. k3s was installed with --tls-san 10.160.0.2 so the API
+# certificate is valid for that address.
+#
+# Usage on the VM (added to the existing -f chain):
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml \
+#                  -f docker-compose.images.yml -f docker-compose.k3s.yml up -d
+services:
+  backend:
+    environment:
+      ASTRA_USE_K8S_METRICS: "1"        # dashboard reads real node metrics
+      ASTRA_K8S_APPLY: "1"              # workspaces become real Pods
+      SCHEDULER_ALGORITHM: "cp_ppo"     # serve the trained CP-PPO policy
+      CP_PPO_MODEL_PATH: "ml/scheduler/pfmppo/artifacts/cp_ppo.pt"
+      ASTRA_CLUSTER_ZONE: "IN-NO"
+      ASTRA_CLUSTER_LOCATION: "Mumbai, India"
+      KUBECONFIG: "/etc/astra/kubeconfig.yaml"
+      # The UI is served from Vercel while this backend stays on the VM, so the
+      # browser opens cross-origin WebSockets (terminal, collab) against it.
+      # Override CORS_ORIGINS on the VM if the Vercel domain differs.
+      CORS_ORIGINS: '["https://astraide.tech","https://www.astraide.tech","https://34-14-181-224.sslip.io","http://localhost:3000"]'
+    volumes:
+      - /etc/astra/k3s-backend.yaml:/etc/astra/kubeconfig.yaml:ro

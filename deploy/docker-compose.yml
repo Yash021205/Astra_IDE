@@ -54,8 +54,9 @@ services:
   backend:
     restart: unless-stopped
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      # Repo root as context so the ml/ package is available for model serving.
+      context: ..
+      dockerfile: backend/Dockerfile
     # Optionally loads carbon token + other secrets from backend/.env (gitignored).
     # `required: false` lets a fresh clone run with no .env present — those
     # features fall back gracefully (carbon uses a historical average, Google
