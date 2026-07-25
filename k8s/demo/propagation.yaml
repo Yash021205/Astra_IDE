@@ -1,0 +1,21 @@
+# Karmada PropagationPolicy for the demo: spread the astra-ws Deployment across
+# both member clusters, weighted 1:1 so replicas land on each and a member
+# failure forces a reschedule onto the survivor.
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: astra-ws-demo
+  namespace: astra-ide
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: astra-ws
+  placement:
+    clusterAffinity:
+      clusterNames: [member-a, member-b]
+    replicaScheduling:
+      replicaSchedulingType: Divided
+      replicaDivisionPreference: Weighted
+      weightPreference:
+        dynamicWeight: AvailableReplicas   # reschedule to the healthy member on failover

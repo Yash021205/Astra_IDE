@@ -21,6 +21,8 @@ spec:
         prometheus.io/port:   "8000"
         prometheus.io/path:   "/metrics"
     spec:
+      # Grants the backend real node/metrics reads and workspace-pod creation.
+      serviceAccountName: astra-backend
       containers:
       - name: api
         image: ghcr.io/prasannamishra001/astra-ide-backend:latest
@@ -35,9 +37,21 @@ spec:
           value: "redis://redis:6379/0"
         - name: COLLAB_WS_URL
           value: "ws://collab:1234"
+        # Real-mode flags: read live k8s node metrics and create real workspace pods.
+        - name: ASTRA_USE_K8S_METRICS
+          value: "1"
+        - name: ASTRA_K8S_APPLY
+          value: "1"
+        - name: SCHEDULER_ALGORITHM
+          value: "cp_ppo"
+        - name: ASTRA_CLUSTER_ZONE
+          value: "IN-NO"
+        - name: ASTRA_CLUSTER_LOCATION
+          value: "Mumbai, India"
         resources:
-          requests: { cpu: "100m", memory: "256Mi" }
-          limits:   { cpu: "500m", memory: "512Mi" }
+          # torch (CPU) + the model raise the footprint over the old 512Mi limit.
+          requests: { cpu: "250m", memory: "768Mi" }
+          limits:   { cpu: "1500m", memory: "1536Mi" }
         readinessProbe:
           httpGet: { path: /healthz, port: 8000 }
           initialDelaySeconds: 5

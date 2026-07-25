@@ -1,0 +1,62 @@
+# RBAC for the backend so it can (a) read real node + metrics-server data for the
+# live dashboard (cluster_state.refresh_from_kubernetes) and (b) create/list/delete
+# real workspace pods (sandbox_runtime.apply_workspace_pod).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: astra-backend
+  namespace: astra-ide
+---
+# Cluster-scoped reads: node capacity + node metrics (metrics.k8s.io).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: astra-backend-cluster
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: astra-backend-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: astra-backend-cluster
+subjects:
+- kind: ServiceAccount
+  name: astra-backend
+  namespace: astra-ide
+---
+# Namespaced writes: real workspace pods live in astra-ide only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: astra-backend-workspaces
+  namespace: astra-ide
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["pods/log", "pods/status"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: astra-backend-workspaces
+  namespace: astra-ide
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: astra-backend-workspaces
+subjects:
+- kind: ServiceAccount
+  name: astra-backend
+  namespace: astra-ide

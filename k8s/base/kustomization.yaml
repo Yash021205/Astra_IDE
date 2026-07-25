@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: astra-ide
 resources:
   - namespace.yaml
+  - rbac.yaml
   - runtime-classes.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml
