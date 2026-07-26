@@ -64,6 +64,29 @@ gVisor sandboxing, Karmada federation, and Tetragon-based eBPF telemetry.
 
 ---
 
+## Inside a workspace
+
+Each workspace is an isolated development environment. Starting it runs a real container for the
+project's language; stopping it tears the container down (your files persist either way, but the
+shell and live preview need a running container).
+
+What a running workspace gives you:
+
+- **Editor.** Monaco with syntax highlighting, multi-cursor collaboration and themes. A path bar
+  above the file shows the current file's workspace-relative path and copies it in one click.
+- **Interactive terminal.** A real shell running inside the workspace container (not a mock),
+  bridged to the browser over a WebSocket PTY. The same file tree is visible in the Explorer.
+- **Run.** Execute the current file in the sandbox and see stdout, stderr and problems.
+- **Preview.** Two modes: serve the workspace's static files, or run a dev server on a port and
+  preview it live. The Preview panel detects the ports your server is listening on and proxies
+  the one you pick, so you can iterate on a web app without leaving the IDE.
+
+To try every feature quickly, import the sample projects from
+[`astra-ide-samples`](https://github.com/PrasannaMishra001/astra-ide-samples): a static site for
+static preview, a dev server for the port proxy, and workloads that trip different sandbox tiers.
+
+---
+
 ## Benchmark results
 
 Each contribution is evaluated on a real public dataset. Representative numbers:
