@@ -1,1 +1,2 @@
 ﻿feat: initialize workspace scaffolding | 2026-08-01
+fix: resolve backend auth flow | 2026-08-03
