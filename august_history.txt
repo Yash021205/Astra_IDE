@@ -1,3 +1,4 @@
 ﻿feat: initialize workspace scaffolding | 2026-08-01
 fix: resolve backend auth flow | 2026-08-03
 refactor: clean up cluster state handling | 2026-08-05
+feat: wire scheduler telemetry and metrics | 2026-08-07
