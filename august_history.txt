@@ -4,3 +4,4 @@ refactor: clean up cluster state handling | 2026-08-05
 feat: wire scheduler telemetry and metrics | 2026-08-07
 fix: patch sandbox runtime validation | 2026-08-09
 chore: add deployment config updates | 2026-08-11
+docs: update project runbook and setup notes | 2026-08-13
